@@ -62,7 +62,7 @@ function setStatus() {
   else if (y.enabled && y.user && y.state === 'busy') { el.textContent = 'Синхронизация…'; el.className = 'chip'; }
   else if (y.enabled && y.user && y.state === 'error') { el.textContent = 'Не синхронизировано: ' + y.msg; el.className = 'chip warn'; }
   else if (y.enabled && y.user) { el.textContent = 'Синхронизировано' + (y.last ? ' в ' + y.last : ''); el.className = 'chip ok'; }
-  else if (y.enabled) { el.textContent = 'Только на этом устройстве. Войдите в «Настройках» для синхронизации'; el.className = 'chip warn'; }
+  else if (y.enabled) { el.textContent = 'Только на этом устройстве. Войдите в «Настройки»'; el.className = 'chip warn'; }
   else { el.textContent = 'Данные сохраняются на этом устройстве'; el.className = 'chip ok'; }
 }
 
