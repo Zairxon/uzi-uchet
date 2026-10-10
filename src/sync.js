@@ -4,6 +4,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import * as store from './storage.js';
+import { t } from './i18n.js';
 
 export const enabled = !!(SUPABASE_URL && SUPABASE_KEY);
 const sb = enabled ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }) : null;
@@ -22,14 +23,14 @@ export function onAuth(cb) {
 }
 
 function msg(e) {
-  const t = String((e && e.message) || e || '');
-  if (/Invalid login credentials/i.test(t)) return 'Неверная почта или пароль.';
-  if (/Email not confirmed/i.test(t)) return 'Почта не подтверждена: откройте письмо от сервиса и перейдите по ссылке.';
-  if (/already registered|already been registered/i.test(t)) return 'Такая почта уже зарегистрирована. Нажмите «Войти».';
-  if (/Password should be/i.test(t)) return 'Пароль слишком простой: нужно не меньше 8 символов.';
-  if (/rate limit/i.test(t)) return 'Слишком много попыток. Подождите немного.';
-  if (/fetch|network|Failed/i.test(t)) return 'Нет связи с сервером.';
-  return t || 'Ошибка';
+  const txt = String((e && e.message) || e || '');
+  if (/Invalid login credentials/i.test(txt)) return t('Неверная почта или пароль.');
+  if (/Email not confirmed/i.test(txt)) return t('Почта не подтверждена: откройте письмо от сервиса и перейдите по ссылке.');
+  if (/already registered|already been registered/i.test(txt)) return t('Такая почта уже зарегистрирована. Нажмите «Войти».');
+  if (/Password should be/i.test(txt)) return t('Пароль слишком простой: нужно не меньше 8 символов.');
+  if (/rate limit/i.test(txt)) return t('Слишком много попыток. Подождите немного.');
+  if (/fetch|network|Failed/i.test(txt)) return t('Нет связи с сервером.');
+  return txt || t('Ошибка');
 }
 
 export async function signIn(email, password) {

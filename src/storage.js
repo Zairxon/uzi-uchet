@@ -2,6 +2,7 @@
 //   config / ключ "main"      -> документ настроек (cfg)
 //   months / ключ "ГГГГ-ММ"   -> документ месяца { ops: [...], payroll }
 // Для синхронизации рядом лежит служебное хранилище meta: путь документа -> { updatedAt, dirty, deleted }.
+import { t } from './i18n.js';
 const DB_NAME = 'uzi-uchet';
 const DB_VERSION = 2;
 const APP_ID = 'uzi-uchet';
@@ -108,16 +109,16 @@ export function makeBackup(cfg, months) {
 // Возвращает { cfg, months } или бросает Error с понятным текстом.
 export function parseBackup(text) {
   let o;
-  try { o = JSON.parse(text); } catch (e) { throw new Error('Файл не похож на резервную копию: это не JSON.'); }
-  if (!o || o.app !== APP_ID) throw new Error('Это не копия «Учёта УЗИ-центра».');
-  if (!Number.isInteger(o.version) || o.version > BACKUP_VERSION) throw new Error('Копия сделана более новой версией приложения.');
-  if (!o.config || typeof o.config !== 'object' || Array.isArray(o.config)) throw new Error('В копии нет настроек.');
-  if (!o.months || typeof o.months !== 'object' || Array.isArray(o.months)) throw new Error('В копии нет данных по месяцам.');
+  try { o = JSON.parse(text); } catch (e) { throw new Error(t('Файл не похож на резервную копию: это не JSON.')); }
+  if (!o || o.app !== APP_ID) throw new Error(t('Это не копия «Учёта УЗИ-центра».'));
+  if (!Number.isInteger(o.version) || o.version > BACKUP_VERSION) throw new Error(t('Копия сделана более новой версией приложения.'));
+  if (!o.config || typeof o.config !== 'object' || Array.isArray(o.config)) throw new Error(t('В копии нет настроек.'));
+  if (!o.months || typeof o.months !== 'object' || Array.isArray(o.months)) throw new Error(t('В копии нет данных по месяцам.'));
   const months = {};
   for (const k of Object.keys(o.months)) {
-    if (!MONTH_KEY.test(k)) throw new Error('В копии неверный ключ месяца: ' + k);
+    if (!MONTH_KEY.test(k)) throw new Error(t('В копии неверный ключ месяца: {k}', { k }));
     const m = o.months[k];
-    if (!m || typeof m !== 'object' || (m.ops != null && !Array.isArray(m.ops))) throw new Error('Повреждены данные за ' + k);
+    if (!m || typeof m !== 'object' || (m.ops != null && !Array.isArray(m.ops))) throw new Error(t('Повреждены данные за {k}', { k }));
     months[k] = m;
   }
   return { cfg: o.config, months };

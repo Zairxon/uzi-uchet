@@ -1,4 +1,4 @@
-export const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+import { months } from './i18n.js';
 
 export const DEF = {
   tax: { regime: 'turnover', turnover: 4, profit: 15, ndfl: 12, inps: 0.1, soc: 12 },
@@ -13,7 +13,7 @@ export function pad(n) { return String(n).padStart(2, '0'); }
 export function today() { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
 export function idx(ym) { return +ym.slice(0, 4) * 12 + (+ym.slice(5, 7)) - 1; }
 export function addM(ym, k) { const t = idx(ym) + k; return Math.floor(t / 12) + '-' + pad(t % 12 + 1); }
-export function mName(ym) { return MONTHS[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4); }
+export function mName(ym) { return months()[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4); }
 export function ymOf(d) { return (d || '').slice(0, 7); }
 export function num(s) { const v = parseFloat(String(s == null ? '' : s).replace(/[\s  ]/g, '').replace(',', '.')); return isFinite(v) ? v : 0; }
 export function fmt(n) { return Math.round(n || 0).toLocaleString('ru-RU'); }
