@@ -1,6 +1,5 @@
 // Шесть вкладок. Разметка перенесена из прототипа без изменений; тексты идут через t() (русский / узбекский).
 // Состояние приходит в объекте S: { cfg, months, M, draft, armed, sync }.
-import heroUrl from './assets/hero.jpg';
 import { sched, payCalc, blank, ytd, compareTax } from './calc.js';
 import { addM, mName, ymOf, fmt, esc } from './util.js';
 import { t, months } from './i18n.js';
@@ -34,8 +33,7 @@ function delBtn(S, act, id) { var on = S.armed === act + id; return '<button cla
 /* ---------- views ---------- */
 export function vHome(S, C) {
   var M = S.M, r = C.cur, B = C.B, exp = r.opexSum + r.payroll + r.rent + r.int + r.dep + r.tax;
-  var h = '<div class="hero-wrap"><img class="hero" src="' + heroUrl + '" alt=""><div class="hero-cap">Митти юракча<small>' + t('УЗИ-скрининг клиника') + '</small></div></div>' +
-    '<section><div class="kpis">' +
+  var h = '<section><div class="kpis">' +
     '<div class="kpi"><span>' + t('Выручка') + '</span><b>' + fmt(r.rev) + '</b></div>' +
     '<div class="kpi"><span>' + t('Расходы и налог') + '</span><b>' + fmt(exp) + '</b></div>' +
     '<div class="kpi"><span>' + t('Чистая прибыль') + '</span><b class="' + (r.net < 0 ? 'neg' : 'pos') + '">' + fmt(r.net) + '</b></div>' +

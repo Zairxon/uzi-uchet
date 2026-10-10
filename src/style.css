@@ -102,7 +102,7 @@ td.lbl{white-space:normal;min-width:150px}
 #toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px);z-index:10}
 .top-l .chip{align-self:flex-start}
 .top-l .chip{white-space:normal;border-radius:12px;max-width:100%}
-.hero{display:block;width:100%;height:150px;object-fit:cover;object-position:50% 50%;border-radius:14px;border:1px solid var(--line)}
+.hero{display:block;width:100%;height:150px;object-fit:cover;object-position:50% 72%;border-radius:14px;border:1px solid var(--line)}
 .hero-cap small{display:block;font-weight:400;font-size:12px;opacity:.9}
 .hero-cap{font-size:18px}
 .hero-wrap{position:relative}
@@ -172,4 +172,30 @@ td.lbl{white-space:normal;min-width:150px}
   .tabs{padding-inline:12px}
   .tabs-in{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}
   .tab{font-size:11.5px;line-height:1.15;min-height:36px;padding:5px 4px;border-radius:10px;letter-spacing:0}
+}
+
+/* ---------- баннер в самом верху, заголовки и карточки мельче ---------- */
+.hero-cap{font-size:14px}
+.hero-cap small{font-size:13px;font-weight:600}
+@media (max-width:600px){
+  .hero{height:84px;border-radius:12px}
+  .hero-cap{padding:16px 11px 6px}
+  .hero-cap small{font-size:12px}
+  h1{font-size:15.5px}
+  h2{font-size:13px}
+  .mnav b{font-size:13px}
+  .panel{padding:9px;gap:8px}
+  .kpis{gap:6px}
+  .kpi{padding:8px 9px;gap:2px}
+  .kpi span{font-size:10.5px}
+  .kpi b{font-size:clamp(13px,3.6vw,15.5px)}
+  .list li{padding:7px 0}
+  .li-main b{font-size:13px}
+  .small{font-size:11.5px}
+  .note{font-size:11.5px}
+  .fld>span{font-size:11px}
+  th{font-size:10.5px}
+  th,td{padding:5px 7px}
+  td.num,td .num{font-size:11.5px}
+  td.lbl{font-size:12.5px}
 }

@@ -12,6 +12,7 @@ import '@fontsource/jetbrains-mono/latin-400.css';
 import '@fontsource/jetbrains-mono/latin-600.css';
 import './style.css';
 import logoUrl from './assets/logo.jpg';
+import heroUrl from './assets/hero.jpg';
 
 import { registerSW } from 'virtual:pwa-register';
 import { compute, payCalc } from './calc.js';
@@ -45,6 +46,7 @@ function applyTheme(t) {
 }
 applyTheme(getTheme());
 document.getElementById('logo').src = logoUrl;
+document.getElementById('hero').src = heroUrl;
 
 /* ---------- storage ---------- */
 function fail(e) {
@@ -122,6 +124,7 @@ function applyStatic() {
   var uz = getLang() === 'uz';
   document.title = uz ? 'Митти юракча: ҳисоб' : 'Митти юракча: учёт';
   set('logo', 'alt', 'Митти юракча');
+  document.getElementById('hero-cap').textContent = T('УЗИ-скрининг клиника');
   document.querySelector('[data-act=prev]').setAttribute('aria-label', T('Предыдущий месяц'));
   document.querySelector('[data-act=next]').setAttribute('aria-label', T('Следующий месяц'));
   var lb = document.getElementById('lang');
