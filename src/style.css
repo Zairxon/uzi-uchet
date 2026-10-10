@@ -103,5 +103,7 @@ td.lbl{white-space:normal;min-width:150px}
 .top-l .chip{align-self:flex-start}
 .top-l .chip{white-space:normal;border-radius:12px;max-width:100%}
 .hero{display:block;width:100%;height:150px;object-fit:cover;object-position:50% 50%;border-radius:14px;border:1px solid var(--line)}
+.hero-cap small{display:block;font-weight:400;font-size:12px;opacity:.9}
+.hero-cap{font-size:18px}
 .hero-wrap{position:relative}
 .hero-cap{position:absolute;left:0;right:0;bottom:0;padding:26px 14px 10px;border-radius:0 0 14px 14px;color:#fff;font-weight:600;background:linear-gradient(transparent,rgba(60,30,0,.55));text-shadow:0 1px 3px rgba(0,0,0,.4)}

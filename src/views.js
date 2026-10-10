@@ -31,7 +31,7 @@ function delBtn(S, act, id) { var on = S.armed === act + id; return '<button cla
 /* ---------- views ---------- */
 export function vHome(S, C) {
   var M = S.M, r = C.cur, B = C.B, exp = r.opexSum + r.payroll + r.rent + r.int + r.dep + r.tax;
-  var h = '<div class="hero-wrap"><img class="hero" src="' + heroUrl + '" alt=""><div class="hero-cap">УЗИ-скрининг клиника</div></div>' +
+  var h = '<div class="hero-wrap"><img class="hero" src="' + heroUrl + '" alt=""><div class="hero-cap">Митти юракча<small>УЗИ-скрининг клиника</small></div></div>' +
     '<section><div class="kpis">' +
     '<div class="kpi"><span>Выручка</span><b>' + fmt(r.rev) + '</b></div>' +
     '<div class="kpi"><span>Расходы и налог</span><b>' + fmt(exp) + '</b></div>' +

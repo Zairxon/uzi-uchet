@@ -11,9 +11,9 @@ export default defineConfig({
       includeAssets: ['icons/favicon.png', 'icons/apple-touch-icon.png'],
       workbox: { globPatterns: ['**/*.{js,css,html,svg,png,jpg,woff,woff2}'], navigateFallback: 'index.html' },
       manifest: {
-        name: 'Учёт УЗИ-центра',
-        short_name: 'Учёт УЗИ',
-        description: 'Внутренний учёт УЗИ-центра: операции, зарплата, кредит, отчёты',
+        name: 'Митти юракча: учёт',
+        short_name: 'Митти юракча',
+        description: 'Митти юракча: внутренний учёт клиники',
         lang: 'ru',
         start_url: './',
         scope: './',
