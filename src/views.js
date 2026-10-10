@@ -28,7 +28,11 @@ function inp(S, label, path, kind, cls) {
   return '<label class="fld' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span>' + (kind === 'date' ? dateField('<input id="' + id + '" data-bind="' + path + '" data-kind="date" ' + a + '>', id) : '<input id="' + id + '" data-bind="' + path + '" data-kind="' + kind + '" ' + a + '>') + '</label>';
 }
 function dateField(inner, id) { return '<span class="dt">' + inner + '<button type="button" class="dt-btn" data-cal="' + id + '" aria-label="' + esc(t('Календарь')) + '">' + '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>' + '</button></span>'; }
-function sel(id, opts, val, attr) { return '<select id="' + id + '" ' + (attr || '') + '>' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === val ? ' selected' : '') + '>' + esc(t(o[1])) + '</option>'; }).join('') + '</select>'; }
+// Выпадающий список: своя кнопка + свой список (см. ui.js), значение лежит в value кнопки
+function sel(id, opts, val, attr) {
+  var cur = opts.filter(function (o) { return o[0] === val; })[0] || opts[0];
+  return '<button type="button" class="sel-btn" id="' + id + '" value="' + esc(cur[0]) + '" aria-haspopup="listbox" ' + (attr || '') + ' data-opts="' + esc(JSON.stringify(opts.map(function (o) { return [o[0], t(o[1])]; }))) + '"><span>' + esc(t(cur[1])) + '</span>' + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>' + '</button>';
+}
 function tr(label, vals, cls) { return '<tr class="' + (cls || '') + '"><td class="lbl">' + t(label) + '</td>' + vals.map(function (v) { return '<td class="num">' + (v === '' ? '' : fmt(v)) + '</td>'; }).join('') + '</tr>'; }
 function delBtn(S, act, id) { var on = S.armed === act + id; return '<button class="btn del' + (on ? ' armed' : '') + '" data-act="' + act + '" data-id="' + esc(id) + '" aria-label="' + t('Удалить') + '">' + (on ? t('Удалить?') : '×') + '</button>'; }
 

@@ -19,6 +19,7 @@ import * as store from './storage.js';
 import * as sync from './sync.js';
 import { t as T, getLang, setLang } from './i18n.js';
 import { parseDate, maskDate, openCal, closeCal } from './datepicker.js';
+import { openSelect, closeSelect, askConfirm } from './ui.js';
 import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP } from './views.js';
 import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js';
 
@@ -103,11 +104,13 @@ function backupLoad(file) {
   file.text().then(function (text) {
     var b = store.parseBackup(text);
     var n = Object.keys(b.months).length;
-    if (!window.confirm(T('Заменить все текущие данные данными из копии (месяцев: {n})? Текущие данные будут стёрты.', { n: n }))) return null;
-    return (db ? store.replaceAll(b.cfg, b.months) : Promise.resolve()).then(function () {
-      S.cfg = merge(DEF, b.cfg); S.months = {};
-      Object.keys(b.months).forEach(function (k) { var x = clone(b.months[k]); if (!x.ops) x.ops = []; S.months[k] = x; });
-      render(); toast(T('Данные загружены из копии')); queueSync();
+    return askConfirm(T('Заменить все текущие данные данными из копии (месяцев: {n})? Текущие данные будут стёрты.', { n: n }), T('Заменить'), T('Отмена')).then(function (ok) {
+      if (!ok) return null;
+      return (db ? store.replaceAll(b.cfg, b.months) : Promise.resolve()).then(function () {
+        S.cfg = merge(DEF, b.cfg); S.months = {};
+        Object.keys(b.months).forEach(function (k) { var x = clone(b.months[k]); if (!x.ops) x.ops = []; S.months[k] = x; });
+        render(); toast(T('Данные загружены из копии')); queueSync();
+      });
     });
   }).catch(function (e) { toast(e && e.message ? e.message : T('Не удалось загрузить копию')); });
 }
@@ -122,7 +125,7 @@ function applyStatic() {
   if (!ready) document.getElementById('view').innerHTML = '<p class="empty">' + T('Загружаю данные. Здесь появятся выручка, расходы, зарплата, кредит и отчёты за выбранный месяц.') + '</p>';
 }
 function render() {
-  closeCal();
+  closeCal(); closeSelect();
   applyStatic();
   document.getElementById('mlabel').textContent = mName(S.M); setStatus();
   document.getElementById('tabs').innerHTML = TABS.map(function (t) { return '<button class="tab" role="tab" data-act="tab" data-id="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + T(t[1]) + '</button>'; }).join('');
@@ -143,6 +146,8 @@ function render() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', function (ev) {
+  var sb = ev.target.closest('.sel-btn');
+  if (sb) { openSelect(sb); return; }
   var cb = ev.target.closest('[data-cal]');
   if (cb) { var ci = document.getElementById(cb.dataset.cal); if (ci) openCal(ci); return; }
   var b = ev.target.closest('[data-act]'); if (!b) return; var act = b.dataset.act, id = b.dataset.id;

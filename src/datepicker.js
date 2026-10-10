@@ -26,7 +26,7 @@ export function maskDate(s) {
 const pad = (n) => String(n).padStart(2, '0');
 const iso = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 
-let pop = null, target = null, vy = 0, vm = 0;
+let pop = null, target = null, vy = 0, vm = 0, openedAt = 0;
 
 function ensure() {
   if (pop) return;
@@ -50,8 +50,10 @@ function ensure() {
     if (!pop.contains(ev.target) && !(ev.target.closest && ev.target.closest('[data-cal]'))) closeCal();
   });
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeCal(); });
-  window.addEventListener('resize', closeCal);
-  window.addEventListener('scroll', () => { if (!pop.hidden) closeCal(); }, true);
+  let w0 = innerWidth;
+  window.addEventListener('resize', () => { if (innerWidth !== w0) { w0 = innerWidth; closeCal(); } });
+  document.addEventListener('ui:popup', (ev) => { if (ev.detail !== 'cal') closeCal(); });
+  window.addEventListener('scroll', () => { if (!pop.hidden && Date.now() - openedAt > 250) closeCal(); }, true);
 }
 
 function pick(value) {
@@ -93,6 +95,8 @@ export function openCal(input) {
   target = input;
   const base = parseDate(input.value) || iso(new Date());
   vy = +base.slice(0, 4); vm = +base.slice(5, 7) - 1;
+  document.dispatchEvent(new CustomEvent('ui:popup', { detail: 'cal' }));
+  target = input; openedAt = Date.now();
   draw(); pop.hidden = false; place();
 }
 
