@@ -154,3 +154,23 @@ td.lbl{white-space:normal;min-width:150px}
   .tabs-in{display:flex;width:100%;gap:0}
   .tab{flex:1 1 auto;display:flex;align-items:center;justify-content:center;text-align:center;white-space:normal;min-height:40px;padding:5px 2px;font-size:11px;line-height:1.15}
 }
+
+/* ---------- вкладки: объёмные кнопки с рамкой и тенью ---------- */
+.tabs{border-bottom:0;padding-block:6px 8px}
+.tabs-in{gap:5px}
+.tab{border:1px solid var(--line);border-bottom-color:color-mix(in srgb,var(--line) 70%,var(--muted));border-radius:10px;
+  background:linear-gradient(180deg,var(--surface) 0%,var(--soft) 100%);color:var(--muted);
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 2px 0 var(--line),0 4px 8px rgba(80,40,10,.14);
+  transition:transform .08s,box-shadow .08s}
+.tab:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 1px 0 var(--line),0 2px 4px rgba(80,40,10,.14)}
+.tab[aria-selected="true"]{color:var(--accent-ink);font-weight:600;border-color:var(--accent);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 82%,#fff) 0%,var(--accent) 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 2px 0 color-mix(in srgb,var(--accent) 65%,#000),0 4px 10px rgba(189,90,23,.35)}
+:root[data-theme="dark"] .tab{box-shadow:0 1px 0 rgba(255,255,255,.08) inset,0 2px 0 rgba(0,0,0,.45),0 4px 8px rgba(0,0,0,.4)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tab{box-shadow:0 1px 0 rgba(255,255,255,.08) inset,0 2px 0 rgba(0,0,0,.45),0 4px 8px rgba(0,0,0,.4)}}
+@media (max-width:600px){
+  .tabs{padding-inline:8px}
+  .tabs-in{gap:3px}
+  .tab{font-size:10px;line-height:1.12;min-height:38px;padding:4px 3px;border-radius:9px;letter-spacing:0}
+}
+@media (max-width:340px){.tabs{padding-inline:4px}.tabs-in{gap:2px}.tab{font-size:9.5px;padding:4px 1px}}
