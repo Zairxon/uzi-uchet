@@ -18,6 +18,7 @@ import { compute, payCalc } from './calc.js';
 import * as store from './storage.js';
 import * as sync from './sync.js';
 import { t as T, getLang, setLang } from './i18n.js';
+import { parseDate, maskDate, openCal, closeCal } from './datepicker.js';
 import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP } from './views.js';
 import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js';
 
@@ -121,6 +122,7 @@ function applyStatic() {
   if (!ready) document.getElementById('view').innerHTML = '<p class="empty">' + T('Загружаю данные. Здесь появятся выручка, расходы, зарплата, кредит и отчёты за выбранный месяц.') + '</p>';
 }
 function render() {
+  closeCal();
   applyStatic();
   document.getElementById('mlabel').textContent = mName(S.M); setStatus();
   document.getElementById('tabs').innerHTML = TABS.map(function (t) { return '<button class="tab" role="tab" data-act="tab" data-id="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + T(t[1]) + '</button>'; }).join('');
@@ -141,6 +143,8 @@ function render() {
 
 /* ---------- events ---------- */
 document.addEventListener('click', function (ev) {
+  var cb = ev.target.closest('[data-cal]');
+  if (cb) { var ci = document.getElementById(cb.dataset.cal); if (ci) openCal(ci); return; }
   var b = ev.target.closest('[data-act]'); if (!b) return; var act = b.dataset.act, id = b.dataset.id;
   if (act.indexOf('del-') === 0) {
     if (S.armed !== act + id) { S.armed = act + id; render(); return; } S.armed = null;
@@ -171,25 +175,21 @@ document.addEventListener('click', function (ev) {
 document.addEventListener('input', function (ev) {
   var el = ev.target;
   if (el.dataset.kind === 'money') { var dg = el.value.replace(/\D/g, ''); el.value = dg ? Number(dg).toLocaleString('ru-RU') : ''; }
-  if (el.dataset.d) S.draft[el.dataset.d] = el.value;
+  if (el.dataset.kind === 'date') el.value = maskDate(el.value);
+  if (el.dataset.d) S.draft[el.dataset.d] = el.dataset.kind === 'date' ? parseDate(el.value) : el.value;
   if (el.id === 'sync-email') S.sync.email = el.value;
   if (el.id === 'sync-pass') S.sync.pass = el.value;
 });
 function validDate(s) { return /^(20\d\d|2100)-\d{2}-\d{2}$/.test(s); }
-// Перерисовка после ввода даты откладывается, чтобы не сбивать набор: по паузе или когда поле потеряло фокус.
-function dateRender() { clearTimeout(dateRender.t); render(); }
-document.addEventListener('focusout', function (ev) { if (!rendering && ev.target.type === 'date' && ev.target.dataset.bind) { clearTimeout(dateRender.t); setTimeout(render, 0); } });
 document.addEventListener('change', function (ev) {
   var el = ev.target;
   if (el.id === 'backup-file') { var f = el.files && el.files[0]; el.value = ''; backupLoad(f); return; }
   var p = el.dataset.bind; if (!p) return;
   var k = el.dataset.kind, v = (k === 'money' || k === 'num') ? num(el.value) : el.value;
-  if (el.type === 'date') {
-    // При наборе года поле даты шлёт промежуточные значения (0002, 0020, 0202). Их не сохраняем.
-    if (v && !validDate(v)) return;
-    if (getP(S.cfg, p) === v) return; setP(S.cfg, p, v); writeCfg();
-    clearTimeout(dateRender.t); dateRender.t = setTimeout(dateRender, 1500);
-    return;
+  if (k === 'date') {
+    var iso = parseDate(el.value);
+    if (el.value.trim() && !iso) { toast(T('Введите дату в формате дд.мм.гггг, год от 2000 до 2100')); render(); return; }
+    v = iso;
   }
   if (getP(S.cfg, p) === v) return; setP(S.cfg, p, v);
   var m = p.match(/^staff\.(\d+)\./); if (m && S.cfg.staff[m[1]]) delete S.cfg.staff[m[1]].example;

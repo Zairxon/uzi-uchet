@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { UZ_DICT, t, setLang, getLang } from '../src/i18n.js';
 
 // Все русские строки интерфейса: литералы в одинарных кавычках без разметки.
-const files = ['src/views.js', 'src/main.js', 'src/sync.js', 'src/storage.js'];
+const files = ['src/views.js', 'src/main.js', 'src/sync.js', 'src/storage.js', 'src/datepicker.js'];
 const strings = new Set();
 for (const f of files) {
   const src = readFileSync(f, 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\/\*)/.test(l)).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');

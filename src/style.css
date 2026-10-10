@@ -286,3 +286,36 @@ td.lbl{white-space:normal;min-width:150px}
   .chip{font-size:10px}
   #toast{font-size:12px}
 }
+
+/* ---------- поле даты и свой календарь ---------- */
+.dt{position:relative;display:block}
+.dt input{padding-right:32px}
+.dt-btn{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:var(--accent);display:grid;place-items:center;cursor:pointer;padding:0}
+.dt-btn:hover{background:var(--soft)}
+.cal{position:fixed;z-index:30;width:252px;padding:8px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(60,25,0,.22),0 2px 6px rgba(60,25,0,.12);font-size:12px}
+.cal[hidden]{display:none}
+.cal button{font:inherit;cursor:pointer}
+.cal-h{display:flex;align-items:center;gap:2px;margin-bottom:6px}
+.cal-h b{flex:1;text-align:center;font-size:12.5px;font-weight:600}
+.cal-h button{width:26px;height:26px;border:0;border-radius:7px;background:transparent;color:var(--accent);font-size:15px;line-height:1;padding:0}
+.cal-h button:hover{background:var(--soft)}
+.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-g i{font-style:normal;text-align:center;font-size:10px;color:var(--muted);padding:3px 0}
+.cal-d{height:30px;border:0;border-radius:8px;background:transparent;color:var(--ink);font-size:12px;padding:0}
+.cal-d:hover{background:var(--soft)}
+.cal-d.out{color:var(--muted);opacity:.55}
+.cal-d.now{box-shadow:inset 0 0 0 1px var(--accent)}
+.cal-d.on{background:var(--accent);color:var(--accent-ink);font-weight:600;opacity:1}
+.cal-f{display:flex;justify-content:space-between;margin-top:6px;border-top:1px solid var(--line);padding-top:6px}
+.cal-f button{border:0;background:transparent;color:var(--accent);font-size:12px;font-weight:600;padding:4px 6px;border-radius:6px}
+.cal-f button:hover{background:var(--soft)}
+
+/* ---------- телефон: поля, списки, комментарий — мельче шрифт ---------- */
+@media (max-width:600px){
+  input,select{font-size:12px}
+  input::placeholder{font-size:11px}
+  select,option{font-size:12px}
+  .dt input{padding-right:30px}
+  .cal{width:244px}
+  .cal-d{height:28px;font-size:11.5px}
+}

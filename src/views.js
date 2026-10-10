@@ -3,6 +3,7 @@
 import { sched, payCalc, blank, ytd, compareTax } from './calc.js';
 import { addM, mName, ymOf, fmt, esc } from './util.js';
 import { t, months, getLang } from './i18n.js';
+import { fmtDate } from './datepicker.js';
 
 export const TABS = [['home', 'Обзор'], ['ops', 'Операции'], ['pay', 'Зарплата'], ['loan', 'Кредит и аренда'], ['rep', 'Отчёты'], ['set', 'Настройки']];
 export const CATS = {
@@ -22,10 +23,11 @@ function inp(S, label, path, kind, cls) {
   var v = getP(S.cfg, path), id = 'f-' + path.replace(/\./g, '-'), a = '';
   if (kind === 'money') a = 'type="text" inputmode="numeric" class="n" value="' + (v ? fmt(v) : '') + '"';
   else if (kind === 'num') a = 'type="text" inputmode="decimal" class="n" value="' + esc(String(v == null ? '' : v).replace('.', ',')) + '"';
-  else if (kind === 'date') a = 'type="date" min="2000-01-01" max="2100-12-31" value="' + esc(v || '') + '"';
+  else if (kind === 'date') a = 'type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="' + esc(t('дд.мм.гггг')) + '"' + (/^(loan|rent)\./.test(path) ? ' data-optional="1"' : '') + ' value="' + esc(fmtDate(v)) + '"';
   else a = 'type="text" value="' + esc(v || '') + '"';
-  return '<label class="fld' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span><input id="' + id + '" data-bind="' + path + '" data-kind="' + kind + '" ' + a + '></label>';
+  return '<label class="fld' + (cls ? ' ' + cls : '') + '"><span>' + label + '</span>' + (kind === 'date' ? dateField('<input id="' + id + '" data-bind="' + path + '" data-kind="date" ' + a + '>', id) : '<input id="' + id + '" data-bind="' + path + '" data-kind="' + kind + '" ' + a + '>') + '</label>';
 }
+function dateField(inner, id) { return '<span class="dt">' + inner + '<button type="button" class="dt-btn" data-cal="' + id + '" aria-label="' + esc(t('Календарь')) + '">' + '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>' + '</button></span>'; }
 function sel(id, opts, val, attr) { return '<select id="' + id + '" ' + (attr || '') + '>' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === val ? ' selected' : '') + '>' + esc(t(o[1])) + '</option>'; }).join('') + '</select>'; }
 function tr(label, vals, cls) { return '<tr class="' + (cls || '') + '"><td class="lbl">' + t(label) + '</td>' + vals.map(function (v) { return '<td class="num">' + (v === '' ? '' : fmt(v)) + '</td>'; }).join('') + '</tr>'; }
 function delBtn(S, act, id) { var on = S.armed === act + id; return '<button class="btn del' + (on ? ' armed' : '') + '" data-act="' + act + '" data-id="' + esc(id) + '" aria-label="' + t('Удалить') + '">' + (on ? t('Удалить?') : '×') + '</button>'; }
@@ -58,7 +60,7 @@ export function vOps(S) {
   var h = '<section><h2>' + t('Новая операция') + '</h2><form class="panel" id="opform" novalidate>' +
     '<div class="seg"><button type="button" data-act="type" data-id="income" aria-pressed="' + (draft.type === 'income') + '">' + t('Поступление') + '</button><button type="button" data-act="type" data-id="expense" aria-pressed="' + (draft.type === 'expense') + '">' + t('Списание') + '</button></div>' +
     '<div class="grid">' +
-    '<label class="fld"><span>' + t('Дата') + '</span><input id="op-date" type="date" min="2000-01-01" max="2100-12-31" data-d="date" value="' + esc(draft.date) + '"></label>' +
+    '<label class="fld"><span>' + t('Дата') + '</span>' + dateField('<input id="op-date" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="' + esc(t('дд.мм.гггг')) + '" data-d="date" data-kind="date" value="' + esc(fmtDate(draft.date)) + '">', 'op-date') + '</label>' +
     '<label class="fld"><span>' + t('Сумма, сум') + '</span><input id="op-amount" type="text" inputmode="numeric" class="n" data-d="amount" data-kind="money" value="' + esc(draft.amount) + '" placeholder="0"></label>' +
     '<label class="fld"><span>' + t('Категория') + '</span>' + sel('op-cat', cats, draft.cat, 'data-d="cat"') + '</label>' +
     '<label class="fld"><span>' + t('Счёт') + '</span>' + sel('op-acct', [['cash', 'Касса (наличные)'], ['bank', 'Банк (карта, перечисление)']], draft.acct, 'data-d="acct"') + '</label>' +
