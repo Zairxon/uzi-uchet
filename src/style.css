@@ -354,3 +354,11 @@ input:-webkit-autofill,input:-webkit-autofill:focus{-webkit-text-fill-color:var(
 /* статус синхронизации теперь в «Настройках» */
 .panel #status{font-size:11px;font-weight:400;white-space:normal;border-radius:10px;line-height:1.3;padding:3px 9px}
 @media (max-width:600px){.panel #status{font-size:10px}}
+
+/* доля врачей */
+.hero-sub{font-size:12px;color:#fff;opacity:.92;text-shadow:0 1px 3px rgba(0,0,0,.45)}
+.docshare{display:flex;align-items:center;gap:6px}
+.docshare input.pct{width:58px;flex:none;text-align:right;min-height:32px;padding:4px 6px}
+.docshare .pctsign{color:var(--muted);font-size:12px}
+.docshare .share{min-width:78px;text-align:right;font-weight:600}
+.docshare.sum{border-top:2px solid var(--line);font-weight:600}

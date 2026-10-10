@@ -7,7 +7,7 @@ import * as store from './storage.js';
 import { t } from './i18n.js';
 
 export const enabled = !!(SUPABASE_URL && SUPABASE_KEY);
-const sb = enabled ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }) : null;
+export const sb = enabled ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }) : null;
 
 const PAGE = 500;
 let running = null, again = false;

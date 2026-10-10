@@ -17,6 +17,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { compute, payCalc } from './calc.js';
 import * as store from './storage.js';
 import * as sync from './sync.js';
+import * as clinic from './clinic.js';
 import { t as T, getLang, setLang } from './i18n.js';
 import { parseDate, maskDate, openCal, closeCal } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
@@ -25,7 +26,7 @@ import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js
 
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
-  theme: 'auto', repView: 'pl', sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
+  theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
   draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
 };
 var db = false, ready = false, rendering = false;
@@ -93,6 +94,18 @@ function authAction(kind) {
   }).catch(function (e) { y.busy = false; render(); toast(e && e.message ? e.message : T('Не удалось войти')); });
 }
 
+/* ---------- доля врачей (данные Ресепшена) ---------- */
+function loadClinic() {
+  var c = S.clinic;
+  if (!sync.enabled || !S.sync.user) { c.state = 'idle'; render(); return Promise.resolve(); }
+  c.state = 'loading'; render();
+  var r = clinic.monthRange(S.M);
+  return clinic.role().then(function (role) {
+    if (!role) { c.state = 'norole'; return null; }
+    return clinic.share(r.from, r.to).then(function (rows) { c.rows = rows; c.state = 'ok'; });
+  }).catch(function (e) { c.state = 'error'; c.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
+}
+
 /* ---------- резервная копия ---------- */
 function backupSave() {
   var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); };
@@ -119,7 +132,8 @@ function backupLoad(file) {
 /* ---------- render ---------- */
 function applyStatic() {
   var uz = getLang() === 'uz';
-  document.title = uz ? 'Митти юракча: ҳисоб' : 'Митти юракча: учёт';
+  document.title = 'Митти юракча: ' + T('Главный');
+  document.getElementById('hero-sub').textContent = T('Главный');
   document.querySelector('[data-act=prev]').setAttribute('aria-label', T('Предыдущий месяц'));
   document.querySelector('[data-act=next]').setAttribute('aria-label', T('Следующий месяц'));
   applyTheme(getTheme());
@@ -164,9 +178,9 @@ document.addEventListener('click', function (ev) {
   if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); }
   else if (act === 'lang-set') { setLang(id); render(); }
   else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
-  else if (act === 'prev') { S.M = addM(S.M, -1); render(); }
-  else if (act === 'next') { S.M = addM(S.M, 1); render(); }
-  else if (act === 'tab') { S.tab = id; try { localStorage.setItem('uzi-tab', S.tab); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); }
+  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); }
+  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); }
+  else if (act === 'tab') { S.tab = id; try { localStorage.setItem('uzi-tab', S.tab); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); if (id === 'pay') loadClinic(); }
   else if (act === 'type') { S.draft.type = id; S.draft.cat = CATS[id][0][0]; render(); }
   else if (act === 'accrue') { if (!S.cfg.staff.length) return; mdoc(S.M).payroll = payCalc(S.cfg.staff, S.cfg.tax); saveMonth(S.M); toast(T('Зарплата за {m} начислена', { m: mName(S.M).toLowerCase() })); }
   else if (act === 'unaccrue') { mdoc(S.M).payroll = null; saveMonth(S.M); }
@@ -191,6 +205,12 @@ function validDate(s) { return /^(20\d\d|2100)-\d{2}-\d{2}$/.test(s); }
 document.addEventListener('change', function (ev) {
   var el = ev.target;
   if (el.id === 'backup-file') { var f = el.files && el.files[0]; el.value = ''; backupLoad(f); return; }
+  if (el.dataset.pct) {
+    var pv = num(el.value);
+    if (!(pv >= 0 && pv <= 100)) { toast(T('Процент от 0 до 100')); render(); return; }
+    clinic.setPercent(el.dataset.pct, pv).then(loadClinic).catch(fail);
+    return;
+  }
   var p = el.dataset.bind; if (!p) return;
   var k = el.dataset.kind, v = (k === 'money' || k === 'num') ? num(el.value) : el.value;
   if (k === 'date') {
@@ -229,9 +249,9 @@ registerSW({ immediate: true });
     sync.onAuth(function (u) {
       var was = S.sync.user && S.sync.user.id;
       S.sync.user = u; render();
-      if (u && (!was || was !== u.id)) doSync(false);
+      if (u && (!was || was !== u.id)) { doSync(false); if (S.tab === 'pay') loadClinic(); }
     });
-    if (S.sync.user) doSync(false); else render();
+    if (S.sync.user) { doSync(false); if (S.tab === 'pay') loadClinic(); } else render();
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - (S.sync.at || 0) > SYNC_EVERY) doSync(false); });
     window.addEventListener('online', function () { doSync(false); });
     setInterval(function () { if (document.visibilityState === 'visible' && navigator.onLine) doSync(false); }, SYNC_EVERY);

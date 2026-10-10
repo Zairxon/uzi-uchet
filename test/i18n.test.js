@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { UZ_DICT, t, setLang, getLang } from '../src/i18n.js';
 
 // Все русские строки интерфейса: литералы в одинарных кавычках без разметки.
-const files = ['src/views.js', 'src/main.js', 'src/sync.js', 'src/storage.js', 'src/datepicker.js', 'src/ui.js'];
+const files = ['src/views.js', 'src/main.js', 'src/sync.js', 'src/storage.js', 'src/datepicker.js', 'src/ui.js', 'src/clinic.js'];
 const strings = new Set();
 for (const f of files) {
   const src = readFileSync(f, 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\/\*)/.test(l)).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
@@ -13,7 +13,7 @@ for (const f of files) {
   }
 }
 // Не показываются пользователю или оставлены намеренно.
-const SKIP = new Set(['Митти юракча', 'Русский', 'Ўзбекча', 'Митти юракча: ҳисоб', 'Митти юракча: учёт', 'РУ', 'ЎЗ', '. Нажмите, чтобы сменить', 'База заблокирована другой вкладкой', 'Транзакция отменена', 'Это не копия «Учёта УЗИ-центра».', 'тёмная', 'светлая', 'как в системе']);
+const SKIP = new Set(['Митти юракча', 'Митти юракча: ', 'Русский', 'Ўзбекча', 'Митти юракча: ҳисоб', 'Митти юракча: учёт', 'РУ', 'ЎЗ', '. Нажмите, чтобы сменить', 'База заблокирована другой вкладкой', 'Транзакция отменена', 'Это не копия «Учёта УЗИ-центра».', 'тёмная', 'светлая', 'как в системе']);
 
 describe('перевод на узбекский (кириллица)', () => {
   it('у каждой русской строки интерфейса есть перевод', () => {
@@ -23,7 +23,7 @@ describe('перевод на узбекский (кириллица)', () => {
   it('в переводах нет латиницы (кроме сайта, JSON и единиц) и пустых значений', () => {
     for (const [k, v] of Object.entries(UZ_DICT)) {
       expect(v.trim(), k).not.toBe('');
-      const lat = v.replace(/\{\w+\}|my\.soliq\.uz|JSON/g, '').match(/[A-Za-z]+/g);
+      const lat = v.replace(/\{\w+\}|my\.soliq\.uz|JSON|Instagram|Telegram/g, '').match(/[A-Za-z]+/g);
       expect(lat, k + ' → ' + v).toBeNull();
     }
   });

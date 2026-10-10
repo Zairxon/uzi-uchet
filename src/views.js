@@ -4,6 +4,7 @@ import { sched, payCalc, blank, ytd, compareTax } from './calc.js';
 import { addM, mName, ymOf, fmt, esc } from './util.js';
 import { t, months, getLang } from './i18n.js';
 import { fmtDate } from './datepicker.js';
+import { APP_LINKS } from './config.js';
 
 export const TABS = [['home', 'Обзор'], ['ops', 'Операции'], ['pay', 'Зарплата'], ['loan', 'Кредит и аренда'], ['rep', 'Отчёты'], ['set', 'Настройки']];
 export const CATS = {
@@ -100,7 +101,7 @@ export function vPay(S) {
   h += '</section><section><h2>' + t('Сотрудники') + '</h2>';
   if (cfg.staff.length) h += '<div class="panel">' + cfg.staff.map(function (s, i) { return '<div class="staff">' + inp(S, t('Имя') + (s.example ? ' <span class="chip">' + t('пример') + '</span>' : ''), 'staff.' + i + '.name', 'text') + inp(S, t('Должность'), 'staff.' + i + '.role', 'text') + inp(S, t('Оклад, сум'), 'staff.' + i + '.salary', 'money') + delBtn(S, 'del-staff', s.id) + '</div>'; }).join('') + '</div>';
   h += '<div class="row"><button class="btn ghost" data-act="add-staff">' + t('Добавить сотрудника') + '</button></div></section>';
-  return h;
+  return h + shareBlock(S);
 }
 
 export function vLoan(S) {
@@ -189,6 +190,30 @@ function lookBlock(S) {
     '</div></section>';
 }
 
+// Доля врачей от оплаченных приёмов (данные приложения «Ресепшен»), процент задаётся здесь
+function shareBlock(S) {
+  var c = S.clinic, h = '<section><h2>' + t('Доля врачей от приёмов') + '</h2>';
+  if (!S.sync.enabled || !S.sync.user) return h + '<p class="empty">' + t('Войдите в «Настройки» (синхронизация), чтобы видеть данные Ресепшена.') + '</p></section>';
+  if (c.state === 'loading' || c.state === 'idle') return h + '<p class="empty">' + t('Загрузка…') + '</p></section>';
+  if (c.state === 'norole') return h + '<p class="alert">' + t('У этой почты нет доступа к данным клиники. Откройте приложение «Ресепшен» и войдите владельцем.') + '</p></section>';
+  if (c.state === 'error') return h + '<p class="alert">' + t('Не удалось получить данные клиники: {m}', { m: esc(c.msg) }) + '</p></section>';
+  var tot = 0, sum = 0, cl = 0;
+  h += '<ul class="list">' + c.rows.map(function (r) {
+    tot += +r.share; sum += +r.total; cl += +r.clients;
+    return '<li class="docshare"><div class="li-main"><b>' + esc(r.doctor_name) + '</b><span class="small muted">' + t('клиентов {n} · оплачено {s}', { n: r.clients, s: fmt(r.total) }) + '</span></div>' +
+      '<input type="text" inputmode="decimal" class="n pct" data-pct="' + esc(r.doctor_id) + '" aria-label="' + esc(t('Процент врача, %')) + '" value="' + esc(String(+r.percent || '').replace('.', ',')) + '" placeholder="0"><span class="pctsign">%</span>' +
+      '<span class="num share">' + fmt(r.share) + '</span></li>';
+  }).join('') + '<li class="docshare sum"><div class="li-main"><b>' + t('Итого к выплате врачам') + '</b><span class="small muted">' + t('клиентов {n} · оплачено {s}', { n: cl, s: fmt(sum) }) + '</span></div><span class="num share">' + fmt(tot) + '</span></li></ul>' +
+    '<p class="note">' + t('Считаются приёмы со статусом «Оплачено» из приложения «Ресепшен» за {m}. Доля = сумма оплат × процент. Проценты видите только вы.', { m: mName(S.M).toLowerCase() }) + '</p></section>';
+  return h;
+}
+
+// Ссылки на другие приложения клиники
+function appsBlock() {
+  var row = function (name, desc, url) { return '<li><div class="li-main"><b>' + t(name) + '</b><span class="small muted">' + t(desc) + '</span></div><a class="btn ghost" href="' + url + '" target="_blank" rel="noopener">' + t('Открыть') + '</a></li>'; };
+  return '<section><h2>' + t('Приложения клиники') + '</h2><ul class="list">' + row('Ресепшен', 'приём клиентов и касса', APP_LINKS.reception) + row('Очередь', 'запись для клиентов: ссылка для Instagram и бота', APP_LINKS.queue) + '</ul></section>';
+}
+
 function syncBlock(S) {
   var y = S.sync; if (!y.enabled) return '';
   var h = '<section><h2>' + t('Синхронизация между устройствами') + '</h2><div class="panel">';
@@ -212,7 +237,7 @@ export function vSet(S) {
     '<div class="grid">' + inp(S, t('Налог с оборота, %'), 'tax.turnover', 'num') + inp(S, t('Налог на прибыль, %'), 'tax.profit', 'num') + '</div></div></section>' +
     '<section><h2>' + t('Ставки с зарплаты') + '</h2><div class="panel"><div class="grid">' + inp(S, t('НДФЛ, %'), 'tax.ndfl', 'num') + inp(S, t('ИНПС, %'), 'tax.inps', 'num') + inp(S, t('Социальный налог, %'), 'tax.soc', 'num') + '</div></div>' +
     '<p class="note">' + t('Ставки по умолчанию взяты на 2026 год и сверены 10.10.2026. Налог на прибыль считается упрощённо, от прибыли каждого месяца. Перед сдачей отчётности сверяйте суммы с бухгалтером и my.soliq.uz: программа ведёт внутренний учёт и официальную отчётность не заменяет.') + '</p></section>' +
-    syncBlock(S) +
+    syncBlock(S) + appsBlock() +
     '<section><h2>' + t('Резервная копия') + '</h2><div class="panel">' +
     '<div class="row"><button class="btn" data-act="backup-save">' + t('Скачать резервную копию') + '</button><button class="btn ghost" data-act="backup-load">' + t('Загрузить из копии') + '</button></div>' +
     '<input id="backup-file" type="file" accept="application/json,.json" hidden></div>' +
