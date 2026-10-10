@@ -23,10 +23,11 @@ import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js
 
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
-  theme: 'auto', sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
+  theme: 'auto', repView: 'pl', sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
   draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
 };
 var db = false, ready = false, rendering = false;
+try { var rv0 = localStorage.getItem('uzi-rep'); if (['pl', 'cash', 'bal', 'cmp'].indexOf(rv0) >= 0) S.repView = rv0; } catch (e) { /* без запоминания */ }
 try { var t0 = localStorage.getItem('uzi-tab'); if (t0 && TABS.some(function (t) { return t[0] === t0; })) S.tab = t0; } catch (e) { /* без запоминания вкладки */ }
 
 /* ---------- тема: как в системе → светлая → тёмная ---------- */
@@ -149,7 +150,8 @@ document.addEventListener('click', function (ev) {
     return;
   }
   S.armed = null;
-  if (act === 'lang-set') { setLang(id); render(); }
+  if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); }
+  else if (act === 'lang-set') { setLang(id); render(); }
   else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
   else if (act === 'prev') { S.M = addM(S.M, -1); render(); }
   else if (act === 'next') { S.M = addM(S.M, 1); render(); }

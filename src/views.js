@@ -135,12 +135,12 @@ export function vRep(S, C) {
   var cfg = S.cfg, M = S.M, mn = months()[+M.slice(5, 7) - 1];
   var r = C.cur, y = ytd(C.rows, M), B = C.B, c = r.cf;
   var taxL = cfg.tax.regime === 'profit' ? t('Налог на прибыль {n}%', { n: cfg.tax.profit }) : t('Налог с оборота {n}%', { n: cfg.tax.turnover });
-  var plH = '<section class="half"><h2>' + t('Прибыль и убытки') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
+  var plH = '<section><h2>' + t('Прибыль и убытки') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
     tr('Выручка', [r.rev, y.rev], 'sum') + OPEX.map(function (k) { return tr(CATNAME[k], [r.opex[k] || 0, y.opex[k] || 0]); }).join('') +
     tr('Зарплата с социальным налогом', [r.payroll, y.payroll]) + tr('Аренда', [r.rent, y.rent]) + tr('Проценты по кредиту', [r.int, y.int]) + tr('Амортизация', [r.dep, y.dep]) +
     tr('Прибыль до налога', [r.preTax, y.preTax], 'sum') + tr(taxL, [r.tax, y.tax]) + tr('Чистая прибыль', [r.net, y.net], 'sum') + '</tbody></table></div></section>';
   var h = '';
-  var cashH = '<section class="half"><h2>' + t('Движение денег за {m}', { m: lc(M) }) + '</h2><div class="scroll"><table><tbody>' +
+  var cashH = '<section><h2>' + t('Движение денег за {m}', { m: lc(M) }) + '</h2><div class="scroll"><table><tbody>' +
     tr('Деньги на начало месяца', [r.open], 'sum') + tr('Получено от клиентов', [c.cust]) + tr('Текущие расходы', [-c.opex]) + tr('Зарплата и налоги с неё', [-c.wage]) + tr('Аренда', [-c.rent]) + tr('Налог с оборота или прибыли', [-c.tax]) +
     tr('Покупка оборудования и ремонт', [-c.capex]) + tr('Получен кредит', [c.loanIn]) + tr('Основной долг по кредиту', [-c.princ]) + tr('Проценты по кредиту', [-c.int]) + tr('Взнос учредителя', [c.contrib]) + tr('Выплата учредителю', [-c.div]) +
     tr('Деньги на конец месяца', [r.close], 'sum') + '</tbody></table></div></section>';
@@ -148,7 +148,7 @@ export function vRep(S, C) {
   var K = compareTax(cfg, C.rows, M), cur = cfg.tax.regime === 'profit' ? 'profit' : 'turnover';
   var cmp = function (s) { return s.turnover <= s.profit ? 'turnover' : 'profit'; };
   var pct = Math.min(100, K.ytd.rev / K.limit * 100);
-  var cmpH = '<section class="half"><h2>' + t('Сравнение налоговых режимов') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
+  var cmpH = '<section><h2>' + t('Сравнение налоговых режимов') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
     tr('Выручка', [K.month.rev, K.ytd.rev]) + tr('Прибыль до налога', [K.month.preTax, K.ytd.preTax]) +
     tr(t('Налог с оборота {n}%', { n: String(cfg.tax.turnover).replace('.', ',') }), [K.month.turnover, K.ytd.turnover], cur === 'turnover' ? 'sum' : '') +
     tr(t('Налог на прибыль {n}%', { n: String(cfg.tax.profit).replace('.', ',') }), [K.month.profit, K.ytd.profit], cur === 'profit' ? 'sum' : '') +
@@ -159,15 +159,19 @@ export function vRep(S, C) {
     '<div class="panel"><div class="row" style="justify-content:space-between"><span class="small muted">' + t('Выручка за год к пределу налога с оборота') + '</span><span class="num small">' + t('{a} из {b}', { a: fmt(K.ytd.rev), b: fmt(K.limit) }) + '</span></div><div class="bar" style="width:' + pct.toFixed(1) + '%"></div></div>' +
     '<p class="note">' + t('Сравнение упрощённое: налог на прибыль считается от прибыли каждого месяца отдельно, убыток одного месяца не уменьшает налог другого. Налог с оборота возможен только при выручке до 1 млрд сум в год. Какой режим применять, решает бухгалтер: программа ведёт внутренний учёт.') + '</p></section>';
   var fa = B.fa - B.dep, A = B.cash + B.bank + fa, L = B.loan + B.pay.wage + B.pay.rent + B.pay.int + B.pay.tax, E = B.contrib - B.div + B.profit;
-  var balH = '<section class="half"><h2>' + t('Баланс на конец месяца') + '</h2><div class="scroll"><table><tbody>' +
+  var balH = '<section><h2>' + t('Баланс на конец месяца') + '</h2><div class="scroll"><table><tbody>' +
     tr('Активы', [''], 'head') + tr('Касса', [B.cash]) + tr('Банк', [B.bank]) + tr('Оборудование и ремонт за вычетом амортизации', [fa]) + tr('Итого активы', [A], 'sum') +
     tr('Обязательства', [''], 'head') + tr('Кредит', [B.loan]) + tr('Зарплата и налоги с неё', [B.pay.wage]) + tr('Аренда', [B.pay.rent]) + tr('Проценты', [B.pay.int]) + tr('Налог с оборота или прибыли', [B.pay.tax]) + tr('Итого обязательства', [L], 'sum') +
     tr('Капитал', [''], 'head') + tr('Взносы учредителя', [B.contrib]) + tr('Выплаты учредителю', [-B.div]) + tr('Накопленная прибыль', [B.profit]) + tr('Итого капитал', [E], 'sum') +
     tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div></section>';
   var balN = '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p>';
-  // две узкие таблицы (подпись и сумма) стоят рядом, пояснения к ним под ними
-  h += '<div class="pair pair3">' + plH + cmpH + '</div>' + cmpRest + '<div class="pair">' + cashH + balH + '</div><div class="notes">' + cashN + balN + '</div>';
-  return h;
+  // один отчёт на экране: таблицы на всю ширину, переключатель сверху
+  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, cmp: cmpH + cmpRest };
+  var rv = blocks[S.repView] ? S.repView : 'pl';
+  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['cmp', 'Налоги']].map(function (x) {
+    return '<button type="button" role="tab" data-act="rep-view" data-id="' + x[0] + '" aria-pressed="' + (rv === x[0]) + '">' + t(x[1]) + '</button>';
+  }).join('') + '</div>';
+  return nav + blocks[rv];
 }
 
 function lookBlock(S) {
