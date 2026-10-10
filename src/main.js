@@ -132,7 +132,7 @@ function backupLoad(file) {
 /* ---------- render ---------- */
 function applyStatic() {
   var uz = getLang() === 'uz';
-  document.title = 'Митти юракча: ' + T('Главный');
+  document.title = '«Митти юракча»: ' + T('Главный');
   document.getElementById('hero-sub').textContent = T('Главный');
   document.querySelector('[data-act=prev]').setAttribute('aria-label', T('Предыдущий месяц'));
   document.querySelector('[data-act=next]').setAttribute('aria-label', T('Следующий месяц'));

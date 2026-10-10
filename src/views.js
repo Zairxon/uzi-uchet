@@ -232,7 +232,7 @@ function syncBlock(S) {
 
 export function vSet(S) {
   var tx = S.cfg.tax;
-  return lookBlock(S) + '<section><h2>' + t('Налоговый режим') + '</h2><div class="panel"><label class="fld"><span>' + t('Как фирма платит налог') + '</span>' +
+  return '<section><h2>' + t('Налоговый режим') + '</h2><div class="panel"><label class="fld"><span>' + t('Как фирма платит налог') + '</span>' +
     sel('f-tax-regime', [['turnover', 'Налог с оборота (выручка до 1 млрд сум в год)'], ['profit', 'Налог на прибыль (выручка выше 1 млрд сум)']], tx.regime, 'data-bind="tax.regime" data-kind="text"') + '</label>' +
     '<div class="grid">' + inp(S, t('Налог с оборота, %'), 'tax.turnover', 'num') + inp(S, t('Налог на прибыль, %'), 'tax.profit', 'num') + '</div></div></section>' +
     '<section><h2>' + t('Ставки с зарплаты') + '</h2><div class="panel"><div class="grid">' + inp(S, t('НДФЛ, %'), 'tax.ndfl', 'num') + inp(S, t('ИНПС, %'), 'tax.inps', 'num') + inp(S, t('Социальный налог, %'), 'tax.soc', 'num') + '</div></div>' +
@@ -241,5 +241,5 @@ export function vSet(S) {
     '<section><h2>' + t('Резервная копия') + '</h2><div class="panel">' +
     '<div class="row"><button class="btn" data-act="backup-save">' + t('Скачать резервную копию') + '</button><button class="btn ghost" data-act="backup-load">' + t('Загрузить из копии') + '</button></div>' +
     '<input id="backup-file" type="file" accept="application/json,.json" hidden></div>' +
-    '<p class="note">' + t('Данные хранятся только на этом устройстве, в памяти браузера. Скачивайте копию регулярно и перед очисткой данных браузера. Загрузка из копии полностью заменяет текущие данные.') + '</p></section>';
+    '<p class="note">' + t('Данные хранятся только на этом устройстве, в памяти браузера. Скачивайте копию регулярно и перед очисткой данных браузера. Загрузка из копии полностью заменяет текущие данные.') + '</p></section>' + lookBlock(S);
 }
