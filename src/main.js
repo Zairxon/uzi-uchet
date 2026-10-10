@@ -57,12 +57,13 @@ function mdoc(m) { if (!S.months[m]) S.months[m] = { ops: [] }; if (!S.months[m]
 function toast(msg) { var el = document.getElementById('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function () { el.hidden = true; }, 3500); }
 function setStatus() {
   var el = document.getElementById('status'), y = S.sync;
+  if (!el) return;
   if (!ready) { el.textContent = T('Подключение…'); el.className = 'chip'; }
   else if (!db) { el.textContent = T('Без сохранения: память браузера недоступна'); el.className = 'chip warn'; }
   else if (y.enabled && y.user && y.state === 'busy') { el.textContent = T('Синхронизация…'); el.className = 'chip'; }
   else if (y.enabled && y.user && y.state === 'error') { el.textContent = T('Не синхронизировано: {m}', { m: y.msg }); el.className = 'chip warn'; }
   else if (y.enabled && y.user) { el.textContent = y.last ? T('Синхронизировано в {t}', { t: y.last }) : T('Синхронизировано'); el.className = 'chip ok'; }
-  else if (y.enabled) { el.textContent = T('Только на этом устройстве. Войдите в «Настройки»'); el.className = 'chip warn'; }
+  else if (y.enabled) { el.textContent = T('Только на этом устройстве. Войдите для синхронизации'); el.className = 'chip warn'; }
   else { el.textContent = T('Данные сохраняются на этом устройстве'); el.className = 'chip ok'; }
 }
 
@@ -135,6 +136,7 @@ function render() {
   var tab = S.tab, C = (tab === 'home' || tab === 'rep') ? compute(S.cfg, S.months, S.M) : null;
   rendering = true;
   view.innerHTML = tab === 'home' ? vHome(S, C) : tab === 'ops' ? vOps(S) : tab === 'pay' ? vPay(S) : tab === 'loan' ? vLoan(S) : tab === 'rep' ? vRep(S, C) : vSet(S);
+  setStatus();
   rendering = false;
   if (keep) {
     var el = document.getElementById(keep.id); if (el) {

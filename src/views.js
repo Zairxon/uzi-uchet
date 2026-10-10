@@ -194,10 +194,11 @@ function syncBlock(S) {
   var h = '<section><h2>' + t('Синхронизация между устройствами') + '</h2><div class="panel">';
   if (y.user) {
     h += '<p>' + t('Вы вошли как {e}.', { e: '<b>' + esc(y.user.email || '') + '</b>' }) + '</p>' +
-      '<p class="small ' + (y.state === 'error' ? 'alert' : 'muted') + '">' + (y.state === 'busy' ? t('Синхронизация…') : y.state === 'error' ? t('Не удалось: {m}', { m: esc(y.msg) }) : t('Последняя синхронизация: {t}', { t: y.last || t('ещё не было') })) + '</p>' +
+      '<p><span id="status" class="chip"></span></p>' +
       '<div class="row"><button class="btn" data-act="sync-now"' + (y.state === 'busy' ? ' disabled' : '') + '>' + t('Синхронизировать сейчас') + '</button><button class="btn ghost" data-act="sync-logout">' + t('Выйти') + '</button></div>';
   } else {
-    h += '<label class="fld"><span>' + t('Почта') + '</span><input id="sync-email" type="email" autocomplete="username" inputmode="email" value="' + esc(y.email) + '"></label>' +
+    h += '<p><span id="status" class="chip"></span></p>' +
+      '<label class="fld"><span>' + t('Почта') + '</span><input id="sync-email" type="email" autocomplete="username" inputmode="email" value="' + esc(y.email) + '"></label>' +
       '<label class="fld"><span>' + t('Пароль (не меньше 8 символов)') + '</span><input id="sync-pass" type="password" autocomplete="current-password" value="' + esc(y.pass) + '"></label>' +
       '<div class="row"><button class="btn" data-act="sync-login"' + (y.busy ? ' disabled' : '') + '>' + t('Войти') + '</button><button class="btn ghost" data-act="sync-signup"' + (y.busy ? ' disabled' : '') + '>' + t('Создать аккаунт') + '</button></div>';
   }
