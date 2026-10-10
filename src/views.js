@@ -135,10 +135,11 @@ export function vRep(S, C) {
   var cfg = S.cfg, M = S.M, mn = months()[+M.slice(5, 7) - 1];
   var r = C.cur, y = ytd(C.rows, M), B = C.B, c = r.cf;
   var taxL = cfg.tax.regime === 'profit' ? t('Налог на прибыль {n}%', { n: cfg.tax.profit }) : t('Налог с оборота {n}%', { n: cfg.tax.turnover });
-  var h = '<section><h2>' + t('Прибыль и убытки') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
+  var plH = '<section class="half"><h2>' + t('Прибыль и убытки') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
     tr('Выручка', [r.rev, y.rev], 'sum') + OPEX.map(function (k) { return tr(CATNAME[k], [r.opex[k] || 0, y.opex[k] || 0]); }).join('') +
     tr('Зарплата с социальным налогом', [r.payroll, y.payroll]) + tr('Аренда', [r.rent, y.rent]) + tr('Проценты по кредиту', [r.int, y.int]) + tr('Амортизация', [r.dep, y.dep]) +
     tr('Прибыль до налога', [r.preTax, y.preTax], 'sum') + tr(taxL, [r.tax, y.tax]) + tr('Чистая прибыль', [r.net, y.net], 'sum') + '</tbody></table></div></section>';
+  var h = '';
   var cashH = '<section class="half"><h2>' + t('Движение денег за {m}', { m: lc(M) }) + '</h2><div class="scroll"><table><tbody>' +
     tr('Деньги на начало месяца', [r.open], 'sum') + tr('Получено от клиентов', [c.cust]) + tr('Текущие расходы', [-c.opex]) + tr('Зарплата и налоги с неё', [-c.wage]) + tr('Аренда', [-c.rent]) + tr('Налог с оборота или прибыли', [-c.tax]) +
     tr('Покупка оборудования и ремонт', [-c.capex]) + tr('Получен кредит', [c.loanIn]) + tr('Основной долг по кредиту', [-c.princ]) + tr('Проценты по кредиту', [-c.int]) + tr('Взнос учредителя', [c.contrib]) + tr('Выплата учредителю', [-c.div]) +
@@ -147,12 +148,12 @@ export function vRep(S, C) {
   var K = compareTax(cfg, C.rows, M), cur = cfg.tax.regime === 'profit' ? 'profit' : 'turnover';
   var cmp = function (s) { return s.turnover <= s.profit ? 'turnover' : 'profit'; };
   var pct = Math.min(100, K.ytd.rev / K.limit * 100);
-  h += '<section><h2>' + t('Сравнение налоговых режимов') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
+  var cmpH = '<section class="half"><h2>' + t('Сравнение налоговых режимов') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
     tr('Выручка', [K.month.rev, K.ytd.rev]) + tr('Прибыль до налога', [K.month.preTax, K.ytd.preTax]) +
     tr(t('Налог с оборота {n}%', { n: String(cfg.tax.turnover).replace('.', ',') }), [K.month.turnover, K.ytd.turnover], cur === 'turnover' ? 'sum' : '') +
     tr(t('Налог на прибыль {n}%', { n: String(cfg.tax.profit).replace('.', ',') }), [K.month.profit, K.ytd.profit], cur === 'profit' ? 'sum' : '') +
-    tr('Разница (оборот − прибыль)', [K.month.turnover - K.month.profit, K.ytd.turnover - K.ytd.profit]) + '</tbody></table></div>' +
-    '<p class="' + (cmp(K.ytd) === cur ? 'small muted' : 'alert') + '">' + (K.ytd.rev === 0 ? t('Пока нет выручки за год, сравнивать нечего.') :
+    tr('Разница (оборот − прибыль)', [K.month.turnover - K.month.profit, K.ytd.turnover - K.ytd.profit]) + '</tbody></table></div></section>';
+  var cmpRest = '<section><p class="' + (cmp(K.ytd) === cur ? 'small muted' : 'alert') + '">' + (K.ytd.rev === 0 ? t('Пока нет выручки за год, сравнивать нечего.') :
       t('С начала года выгоднее {r}: он меньше на {n} сум.', { r: cmp(K.ytd) === 'turnover' ? t('налог с оборота') : t('налог на прибыль'), n: fmt(Math.abs(K.ytd.turnover - K.ytd.profit)) }) +
       (cmp(K.ytd) === cur ? t(' Сейчас выбран именно он.') : t(' Сейчас выбран другой режим (вкладка «Настройки»).'))) + '</p>' +
     '<div class="panel"><div class="row" style="justify-content:space-between"><span class="small muted">' + t('Выручка за год к пределу налога с оборота') + '</span><span class="num small">' + t('{a} из {b}', { a: fmt(K.ytd.rev), b: fmt(K.limit) }) + '</span></div><div class="bar" style="width:' + pct.toFixed(1) + '%"></div></div>' +
@@ -165,7 +166,7 @@ export function vRep(S, C) {
     tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div></section>';
   var balN = '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p>';
   // две узкие таблицы (подпись и сумма) стоят рядом, пояснения к ним под ними
-  h += '<div class="pair">' + cashH + balH + '</div><div class="notes">' + cashN + balN + '</div>';
+  h += '<div class="pair pair3">' + plH + cmpH + '</div>' + cmpRest + '<div class="pair">' + cashH + balH + '</div><div class="notes">' + cashN + balN + '</div>';
   return h;
 }
 
