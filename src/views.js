@@ -2,7 +2,7 @@
 // Состояние приходит в объекте S: { cfg, months, M, draft, armed, sync }.
 import { sched, payCalc, blank, ytd, compareTax } from './calc.js';
 import { addM, mName, ymOf, fmt, esc } from './util.js';
-import { t, months } from './i18n.js';
+import { t, months, getLang } from './i18n.js';
 
 export const TABS = [['home', 'Обзор'], ['ops', 'Операции'], ['pay', 'Зарплата'], ['loan', 'Кредит и аренда'], ['rep', 'Отчёты'], ['set', 'Настройки']];
 export const CATS = {
@@ -167,6 +167,15 @@ export function vRep(S, C) {
   return h;
 }
 
+function lookBlock(S) {
+  var lang = getLang(), th = S.theme || 'auto';
+  var btn = function (act, id, on, label) { return '<button type="button" data-act="' + act + '" data-id="' + id + '" aria-pressed="' + on + '">' + label + '</button>'; };
+  return '<section><h2>' + t('Язык и тема') + '</h2><div class="panel">' +
+    '<div class="fld"><span>' + t('Язык') + '</span><div class="seg">' + btn('lang-set', 'ru', lang === 'ru', 'Русский') + btn('lang-set', 'uz', lang === 'uz', 'Ўзбекча') + '</div></div>' +
+    '<div class="fld"><span>' + t('Тема') + '</span><div class="seg three">' + btn('theme-set', 'auto', th === 'auto', t('Как в системе')) + btn('theme-set', 'light', th === 'light', t('Светлая')) + btn('theme-set', 'dark', th === 'dark', t('Тёмная')) + '</div></div>' +
+    '</div></section>';
+}
+
 function syncBlock(S) {
   var y = S.sync; if (!y.enabled) return '';
   var h = '<section><h2>' + t('Синхронизация между устройствами') + '</h2><div class="panel">';
@@ -179,12 +188,12 @@ function syncBlock(S) {
       '<label class="fld"><span>' + t('Пароль (не меньше 8 символов)') + '</span><input id="sync-pass" type="password" autocomplete="current-password" value="' + esc(y.pass) + '"></label>' +
       '<div class="row"><button class="btn" data-act="sync-login"' + (y.busy ? ' disabled' : '') + '>' + t('Войти') + '</button><button class="btn ghost" data-act="sync-signup"' + (y.busy ? ' disabled' : '') + '>' + t('Создать аккаунт') + '</button></div>';
   }
-  return h + '</div><p class="note">' + t('Войдите с одной и той же почтой на компьютере и на телефоне, и данные будут общими. Приложение работает и без сети: правки отправятся, когда связь появится. Если один и тот же месяц изменили на двух устройствах без связи, останется более поздняя правка.') + '</p></section>';
+  return h + '</div><p class="note">' + t('Войдите с одной и той же почтой на компьютере и на телефоне, и данные будут общими. Приложение работает и без сети: правки отправятся, когда связь появится. Если один и тот же месяц изменили на двух устройствах без связи, останется более поздняя правка. Свои правки приложение отправляет сразу, а чужие подтягивает каждые 30 минут (или по кнопке «Синхронизировать сейчас»).') + '</p></section>';
 }
 
 export function vSet(S) {
   var tx = S.cfg.tax;
-  return '<section><h2>' + t('Налоговый режим') + '</h2><div class="panel"><label class="fld"><span>' + t('Как фирма платит налог') + '</span>' +
+  return lookBlock(S) + '<section><h2>' + t('Налоговый режим') + '</h2><div class="panel"><label class="fld"><span>' + t('Как фирма платит налог') + '</span>' +
     sel('f-tax-regime', [['turnover', 'Налог с оборота (выручка до 1 млрд сум в год)'], ['profit', 'Налог на прибыль (выручка выше 1 млрд сум)']], tx.regime, 'data-bind="tax.regime" data-kind="text"') + '</label>' +
     '<div class="grid">' + inp(S, t('Налог с оборота, %'), 'tax.turnover', 'num') + inp(S, t('Налог на прибыль, %'), 'tax.profit', 'num') + '</div></div></section>' +
     '<section><h2>' + t('Ставки с зарплаты') + '</h2><div class="panel"><div class="grid">' + inp(S, t('НДФЛ, %'), 'tax.ndfl', 'num') + inp(S, t('ИНПС, %'), 'tax.inps', 'num') + inp(S, t('Социальный налог, %'), 'tax.soc', 'num') + '</div></div>' +

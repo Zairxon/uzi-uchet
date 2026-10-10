@@ -199,3 +199,21 @@ td.lbl{white-space:normal;min-width:150px}
   td.num,td .num{font-size:11.5px}
   td.lbl{font-size:12.5px}
 }
+
+/* ---------- баннер: название слева внизу, под ним статус синхронизации ---------- */
+.hero{height:132px}
+.hero-cap{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;gap:5px;padding:12px 14px;border-radius:14px;
+  background:linear-gradient(35deg,rgba(60,25,0,.74) 0%,rgba(60,25,0,.28) 52%,transparent 78%)}
+.hero-title{margin:0;font-size:22px;line-height:1.1;font-weight:700;color:#fff;letter-spacing:0;text-shadow:0 1px 4px rgba(0,0,0,.45)}
+.hero-cap #status{background:rgba(20,10,4,.6);color:#fff;border-radius:10px;font-size:11.5px;max-width:82%;white-space:normal;line-height:1.25;padding:3px 8px;backdrop-filter:blur(3px)}
+.hero-cap #status.ok{color:#c3f2bc}
+.hero-cap #status.warn{color:#ffd9a0}
+.seg.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.fld .seg{width:100%}
+@media (max-width:600px){
+  .hero{height:104px}
+  .hero-cap{padding:9px 11px;gap:4px;border-radius:12px}
+  .hero-title{font-size:18px}
+  .hero-cap #status{font-size:10.5px;padding:2px 7px}
+  .seg.three button{font-size:12px}
+}

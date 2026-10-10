@@ -11,7 +11,6 @@ import '@fontsource/jetbrains-mono/cyrillic-600.css';
 import '@fontsource/jetbrains-mono/latin-400.css';
 import '@fontsource/jetbrains-mono/latin-600.css';
 import './style.css';
-import logoUrl from './assets/logo.jpg';
 import heroUrl from './assets/hero.jpg';
 
 import { registerSW } from 'virtual:pwa-register';
@@ -24,7 +23,7 @@ import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js
 
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
-  sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
+  theme: 'auto', sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
   draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
 };
 var db = false, ready = false, rendering = false;
@@ -36,16 +35,9 @@ function getTheme() { try { var t = localStorage.getItem('uzi-theme'); return TH
 function applyTheme(t) {
   var el = document.documentElement;
   if (t === 'auto') el.removeAttribute('data-theme'); else el.setAttribute('data-theme', t);
-  var dark = t === 'dark' || (t === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  var b = document.getElementById('theme');
-  if (b) {
-    b.textContent = t === 'auto' ? '◐' : dark ? '☾' : '☀';
-    b.title = T('Тема: ' + (t === 'auto' ? 'как в системе' : dark ? 'тёмная' : 'светлая') + '. Нажмите, чтобы сменить');
-    b.setAttribute('aria-label', b.title);
-  }
+  S.theme = t;
 }
 applyTheme(getTheme());
-document.getElementById('logo').src = logoUrl;
 document.getElementById('hero').src = heroUrl;
 
 /* ---------- storage ---------- */
@@ -72,14 +64,14 @@ function setStatus() {
 }
 
 /* ---------- синхронизация между устройствами ---------- */
-var syncTimer = null;
+var syncTimer = null, SYNC_EVERY = 30 * 60 * 1000; // чужие правки подтягиваются раз в полчаса
 function hhmm() { var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); }; return p(d.getHours()) + ':' + p(d.getMinutes()); }
 function queueSync() { if (!S.sync.user) return; clearTimeout(syncTimer); syncTimer = setTimeout(function () { doSync(false); }, 1500); }
 function doSync(manual) {
   var y = S.sync; if (!y.enabled || !y.user || !db) return Promise.resolve();
   y.state = 'busy'; y.msg = ''; setStatus(); if (manual) render();
   return sync.syncNow().then(function (r) {
-    y.state = 'ok'; y.last = hhmm();
+    y.state = 'ok'; y.last = hhmm(); y.at = Date.now();
     if (r && r.changed) return store.loadAll().then(function (got) { S.cfg = merge(DEF, got.cfg); S.months = got.months; });
   }).catch(function (e) {
     console.error(e); y.state = 'error'; y.msg = navigator.onLine ? sync.describeError(e) : T('нет сети');
@@ -120,15 +112,10 @@ function backupLoad(file) {
 
 /* ---------- render ---------- */
 function applyStatic() {
-  var set = function (id, attr, v) { var el = document.getElementById(id); if (el) el.setAttribute(attr, v); };
   var uz = getLang() === 'uz';
   document.title = uz ? 'Митти юракча: ҳисоб' : 'Митти юракча: учёт';
-  set('logo', 'alt', 'Митти юракча');
-  document.getElementById('hero-cap').textContent = T('УЗИ-скрининг клиника');
   document.querySelector('[data-act=prev]').setAttribute('aria-label', T('Предыдущий месяц'));
   document.querySelector('[data-act=next]').setAttribute('aria-label', T('Следующий месяц'));
-  var lb = document.getElementById('lang');
-  if (lb) { lb.textContent = uz ? 'РУ' : 'ЎЗ'; lb.title = T('Сменить язык'); lb.setAttribute('aria-label', T('Сменить язык')); }
   applyTheme(getTheme());
   if (!ready) document.getElementById('view').innerHTML = '<p class="empty">' + T('Загружаю данные. Здесь появятся выручка, расходы, зарплата, кредит и отчёты за выбранный месяц.') + '</p>';
 }
@@ -162,8 +149,8 @@ document.addEventListener('click', function (ev) {
     return;
   }
   S.armed = null;
-  if (act === 'lang') { setLang(getLang() === 'uz' ? 'ru' : 'uz'); render(); }
-  else if (act === 'theme') { var nt = THEMES[(THEMES.indexOf(getTheme()) + 1) % 3]; try { localStorage.setItem('uzi-theme', nt); } catch (e) { /* не страшно */ } applyTheme(nt); }
+  if (act === 'lang-set') { setLang(id); render(); }
+  else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
   else if (act === 'prev') { S.M = addM(S.M, -1); render(); }
   else if (act === 'next') { S.M = addM(S.M, 1); render(); }
   else if (act === 'tab') { S.tab = id; try { localStorage.setItem('uzi-tab', S.tab); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); }
@@ -236,9 +223,9 @@ registerSW({ immediate: true });
       if (u && (!was || was !== u.id)) doSync(false);
     });
     if (S.sync.user) doSync(false); else render();
-    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') doSync(false); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - (S.sync.at || 0) > SYNC_EVERY) doSync(false); });
     window.addEventListener('online', function () { doSync(false); });
-    setInterval(function () { if (document.visibilityState === 'visible' && navigator.onLine) doSync(false); }, 30000);
+    setInterval(function () { if (document.visibilityState === 'visible' && navigator.onLine) doSync(false); }, SYNC_EVERY);
   }
 })();
 
