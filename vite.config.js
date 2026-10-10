@@ -8,8 +8,8 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon.svg', 'icons/apple-touch-icon.png'],
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'], navigateFallback: 'index.html' },
+      includeAssets: ['icons/favicon.png', 'icons/apple-touch-icon.png'],
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,jpg,woff,woff2}'], navigateFallback: 'index.html' },
       manifest: {
         name: 'Учёт УЗИ-центра',
         short_name: 'Учёт УЗИ',

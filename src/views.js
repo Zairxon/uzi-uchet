@@ -1,5 +1,6 @@
 // Шесть вкладок. Разметка и тексты перенесены из прототипа без изменений.
 // Состояние приходит в объекте S: { cfg, months, M, draft, armed }.
+import heroUrl from './assets/hero.jpg';
 import { sched, payCalc, blank, ytd, compareTax } from './calc.js';
 import { MONTHS, addM, mName, ymOf, fmt, esc } from './util.js';
 
@@ -30,7 +31,8 @@ function delBtn(S, act, id) { var on = S.armed === act + id; return '<button cla
 /* ---------- views ---------- */
 export function vHome(S, C) {
   var M = S.M, r = C.cur, B = C.B, exp = r.opexSum + r.payroll + r.rent + r.int + r.dep + r.tax;
-  var h = '<section><div class="kpis">' +
+  var h = '<div class="hero-wrap"><img class="hero" src="' + heroUrl + '" alt=""><div class="hero-cap">УЗИ-скрининг клиника</div></div>' +
+    '<section><div class="kpis">' +
     '<div class="kpi"><span>Выручка</span><b>' + fmt(r.rev) + '</b></div>' +
     '<div class="kpi"><span>Расходы и налог</span><b>' + fmt(exp) + '</b></div>' +
     '<div class="kpi"><span>Чистая прибыль</span><b class="' + (r.net < 0 ? 'neg' : 'pos') + '">' + fmt(r.net) + '</b></div>' +

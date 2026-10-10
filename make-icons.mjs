@@ -1,12 +1,15 @@
-// Рисует PNG-иконки из icon.svg. Запуск: node make-icons.mjs
+// Готовит логотип и иконки из brand/logo-source.jpg. Запуск: node make-icons.mjs
 import sharp from 'sharp';
-import { readFileSync } from 'node:fs';
-const svg = readFileSync('public/icons/icon.svg');
-const full = (s, f) => sharp(svg, { density: 384 }).resize(s, s).png().toFile('public/icons/' + f);
-await full(192, 'icon-192.png');
-await full(512, 'icon-512.png');
-await full(180, 'apple-touch-icon.png');
-// maskable: фон на весь холст, рисунок в безопасной зоне 80%
-const inner = await sharp(svg, { density: 384 }).resize(410, 410).png().toBuffer();
-await sharp({ create: { width: 512, height: 512, channels: 4, background: '#0b6e75' } })
-  .composite([{ input: inner, gravity: 'center' }]).png().toFile('public/icons/icon-maskable-512.png');
+const SRC = 'brand/logo-source.jpg';
+const crop = (left, top, size) => sharp(SRC).extract({ left, top, width: size, height: size });
+// квадрат вокруг головы и плеч малыша
+const sq = () => crop(260, 90, 1240);
+await sq().resize(192).png().toFile('public/icons/icon-192.png');
+await sq().resize(512).png({ palette: true, quality: 80, effort: 10 }).toFile('public/icons/icon-512.png');
+await sq().resize(180).png().toFile('public/icons/apple-touch-icon.png');
+await sq().resize(64).png().toFile('public/icons/favicon.png');
+// maskable: рисунок в безопасной зоне (центральные 80%), поэтому берём квадрат шире
+await crop(0, 120, 1676).resize(512).png({ palette: true, quality: 80, effort: 10 }).toFile('public/icons/icon-maskable-512.png');
+// шапка и баннер главной
+await sq().resize(176).jpeg({ quality: 85 }).toFile('src/assets/logo.jpg');
+await sharp(SRC).extract({ left: 0, top: 330, width: 1676, height: 760 }).resize(1000).jpeg({ quality: 78 }).toFile('src/assets/hero.jpg');

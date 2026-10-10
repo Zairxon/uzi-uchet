@@ -11,6 +11,7 @@ import '@fontsource/jetbrains-mono/cyrillic-600.css';
 import '@fontsource/jetbrains-mono/latin-400.css';
 import '@fontsource/jetbrains-mono/latin-600.css';
 import './style.css';
+import logoUrl from './assets/logo.jpg';
 
 import { registerSW } from 'virtual:pwa-register';
 import { compute, payCalc } from './calc.js';
@@ -42,6 +43,7 @@ function applyTheme(t) {
   }
 }
 applyTheme(getTheme());
+document.getElementById('logo').src = logoUrl;
 
 /* ---------- storage ---------- */
 function fail(e) {
