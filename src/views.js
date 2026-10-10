@@ -139,11 +139,11 @@ export function vRep(S, C) {
     tr('Выручка', [r.rev, y.rev], 'sum') + OPEX.map(function (k) { return tr(CATNAME[k], [r.opex[k] || 0, y.opex[k] || 0]); }).join('') +
     tr('Зарплата с социальным налогом', [r.payroll, y.payroll]) + tr('Аренда', [r.rent, y.rent]) + tr('Проценты по кредиту', [r.int, y.int]) + tr('Амортизация', [r.dep, y.dep]) +
     tr('Прибыль до налога', [r.preTax, y.preTax], 'sum') + tr(taxL, [r.tax, y.tax]) + tr('Чистая прибыль', [r.net, y.net], 'sum') + '</tbody></table></div></section>';
-  h += '<section><h2>' + t('Движение денег за {m}', { m: lc(M) }) + '</h2><div class="scroll"><table><tbody>' +
+  var cashH = '<section class="half"><h2>' + t('Движение денег за {m}', { m: lc(M) }) + '</h2><div class="scroll"><table><tbody>' +
     tr('Деньги на начало месяца', [r.open], 'sum') + tr('Получено от клиентов', [c.cust]) + tr('Текущие расходы', [-c.opex]) + tr('Зарплата и налоги с неё', [-c.wage]) + tr('Аренда', [-c.rent]) + tr('Налог с оборота или прибыли', [-c.tax]) +
     tr('Покупка оборудования и ремонт', [-c.capex]) + tr('Получен кредит', [c.loanIn]) + tr('Основной долг по кредиту', [-c.princ]) + tr('Проценты по кредиту', [-c.int]) + tr('Взнос учредителя', [c.contrib]) + tr('Выплата учредителю', [-c.div]) +
-    tr('Деньги на конец месяца', [r.close], 'sum') + '</tbody></table></div>' +
-    '<p class="note">' + t('Прибыль и деньги не совпадают: покупка аппарата и возврат кредита уменьшают деньги, но не прибыль, а амортизация уменьшает прибыль, но не деньги.') + '</p></section>';
+    tr('Деньги на конец месяца', [r.close], 'sum') + '</tbody></table></div></section>';
+  var cashN = '<p class="note">' + t('Прибыль и деньги не совпадают: покупка аппарата и возврат кредита уменьшают деньги, но не прибыль, а амортизация уменьшает прибыль, но не деньги.') + '</p>';
   var K = compareTax(cfg, C.rows, M), cur = cfg.tax.regime === 'profit' ? 'profit' : 'turnover';
   var cmp = function (s) { return s.turnover <= s.profit ? 'turnover' : 'profit'; };
   var pct = Math.min(100, K.ytd.rev / K.limit * 100);
@@ -158,12 +158,14 @@ export function vRep(S, C) {
     '<div class="panel"><div class="row" style="justify-content:space-between"><span class="small muted">' + t('Выручка за год к пределу налога с оборота') + '</span><span class="num small">' + t('{a} из {b}', { a: fmt(K.ytd.rev), b: fmt(K.limit) }) + '</span></div><div class="bar" style="width:' + pct.toFixed(1) + '%"></div></div>' +
     '<p class="note">' + t('Сравнение упрощённое: налог на прибыль считается от прибыли каждого месяца отдельно, убыток одного месяца не уменьшает налог другого. Налог с оборота возможен только при выручке до 1 млрд сум в год. Какой режим применять, решает бухгалтер: программа ведёт внутренний учёт.') + '</p></section>';
   var fa = B.fa - B.dep, A = B.cash + B.bank + fa, L = B.loan + B.pay.wage + B.pay.rent + B.pay.int + B.pay.tax, E = B.contrib - B.div + B.profit;
-  h += '<section><h2>' + t('Баланс на конец месяца') + '</h2><div class="scroll"><table><tbody>' +
+  var balH = '<section class="half"><h2>' + t('Баланс на конец месяца') + '</h2><div class="scroll"><table><tbody>' +
     tr('Активы', [''], 'head') + tr('Касса', [B.cash]) + tr('Банк', [B.bank]) + tr('Оборудование и ремонт за вычетом амортизации', [fa]) + tr('Итого активы', [A], 'sum') +
     tr('Обязательства', [''], 'head') + tr('Кредит', [B.loan]) + tr('Зарплата и налоги с неё', [B.pay.wage]) + tr('Аренда', [B.pay.rent]) + tr('Проценты', [B.pay.int]) + tr('Налог с оборота или прибыли', [B.pay.tax]) + tr('Итого обязательства', [L], 'sum') +
     tr('Капитал', [''], 'head') + tr('Взносы учредителя', [B.contrib]) + tr('Выплаты учредителю', [-B.div]) + tr('Накопленная прибыль', [B.profit]) + tr('Итого капитал', [E], 'sum') +
-    tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div>' +
-    '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p></section>';
+    tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div></section>';
+  var balN = '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p>';
+  // две узкие таблицы (подпись и сумма) стоят рядом, пояснения к ним под ними
+  h += '<div class="pair">' + cashH + balH + '</div><div class="notes">' + cashN + balN + '</div>';
   return h;
 }
 
