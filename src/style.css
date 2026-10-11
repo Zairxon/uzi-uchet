@@ -362,3 +362,29 @@ input:-webkit-autofill,input:-webkit-autofill:focus{-webkit-text-fill-color:var(
 .docshare .pctsign{color:var(--muted);font-size:12px}
 .docshare .share{min-width:78px;text-align:right;font-weight:600}
 .docshare.sum{border-top:2px solid var(--line);font-weight:600}
+
+/* ---- Зарплата: карточки вместо таблицы, без прокрутки вбок ---- */
+.pcards{display:grid;gap:8px}
+.pcard{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:10px 12px}
+.pcard.sum{background:var(--soft);font-weight:600}
+.pc-h{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;margin-bottom:6px}
+.pc-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}
+.pc-c{display:flex;flex-direction:column;min-width:0}
+.pc-c .num{font-size:15px;overflow-wrap:anywhere}
+.pc-c.strong .num{font-weight:700}
+.staff2{display:flex;flex-direction:column;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.staff2:last-child{border-bottom:0;padding-bottom:0}
+/* ---- Кредит: график и статусы ---- */
+.loansum{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.lchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.chip.st-paid,tr.st-paid{--st:var(--good)}
+.chip.st-soon,tr.st-soon{--st:var(--warn)}
+.chip.st-late,tr.st-late{--st:var(--bad)}
+.chip.st-paid,.chip.st-soon,.chip.st-late{background:color-mix(in srgb,var(--st) 18%,transparent);color:var(--st);border-color:color-mix(in srgb,var(--st) 45%,transparent)}
+tr.st-paid td,tr.st-soon td,tr.st-late td{background:color-mix(in srgb,var(--st) 14%,transparent)}
+tr.st-paid .stc,tr.st-soon .stc,tr.st-late .stc{color:var(--st);font-weight:600}
+td.stc{font-size:12px;white-space:nowrap}
+
+textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:9px 10px;width:100%;min-width:0;min-height:84px;resize:vertical;line-height:1.4}
+textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.fld input+input{margin-top:6px}

@@ -18,15 +18,16 @@ import { compute, payCalc } from './calc.js';
 import * as store from './storage.js';
 import * as sync from './sync.js';
 import * as clinic from './clinic.js';
+import { fmtPhoneInput, cleanPhone } from './phone.js';
 import { t as T, getLang, setLang } from './i18n.js';
 import { parseDate, maskDate, openCal, closeCal } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
-import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP } from './views.js';
+import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff } from './views.js';
 import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js';
 
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
-  theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
+  theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, info: { state: 'idle', s: null, d: [], msg: '', busy: false }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
   draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
 };
 var db = false, ready = false, rendering = false;
@@ -106,6 +107,40 @@ function loadClinic() {
   }).catch(function (e) { c.state = 'error'; c.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
 }
 
+/* ---------- данные клиники для Навбата и бота ---------- */
+function mapCoords(url) {
+  var a = /@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(url) || /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/.exec(url);
+  if (a) return { lat: a[1], lng: a[2] };
+  var b = /[?&](?:ll|pt)=(-?\d+\.\d+)(?:%2C|,)(-?\d+\.\d+)/.exec(url); // Яндекс: сначала долгота
+  if (b) return { lat: b[2], lng: b[1] };
+  var c = /[?&]q=(-?\d+\.\d+)(?:%2C|,)(-?\d+\.\d+)/.exec(url);
+  return c ? { lat: c[1], lng: c[2] } : null;
+}
+function loadInfo() {
+  var I = S.info;
+  if (!sync.enabled || !S.sync.user) { I.state = 'idle'; render(); return Promise.resolve(); }
+  I.state = 'loading'; render();
+  return clinic.role().then(function (role) {
+    if (!role) { I.state = 'norole'; return null; }
+    return clinic.loadInfo().then(function (r) {
+      var s = r.s; s.ph = (s.phones || []).slice(0, 3);
+      s.lat = s.lat == null ? '' : String(s.lat).replace('.', ','); s.lng = s.lng == null ? '' : String(s.lng).replace('.', ',');
+      s.perks_ru_t = (s.perks_ru || []).join('\n'); s.perks_uz_t = (s.perks_uz || []).join('\n');
+      I.s = s; I.d = r.d; I.state = 'ok';
+    });
+  }).catch(function (e) { I.state = 'error'; I.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
+}
+function saveInfo() {
+  var I = S.info, s = I.s, nz = function (x) { x = (x || '').trim(); return x ? x : null; }, lines = function (x) { return (x || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean); };
+  var ll = function (x) { var n = parseFloat(String(x || '').replace(',', '.')); return isFinite(n) ? n : null; };
+  var row = { address: nz(s.address), phones: s.ph.map(cleanPhone).filter(Boolean), map_url: nz(s.map_url), lat: ll(s.lat), lng: ll(s.lng), slogan_ru: nz(s.slogan_ru), slogan_uz: nz(s.slogan_uz), about_ru: nz(s.about_ru), about_uz: nz(s.about_uz), perks_ru: lines(s.perks_ru_t), perks_uz: lines(s.perks_uz_t) };
+  if ((row.lat != null && Math.abs(row.lat) > 90) || (row.lng != null && Math.abs(row.lng) > 180)) { toast(T('Проверьте широту и долготу')); return; }
+  I.busy = true; render();
+  clinic.saveInfo(row, I.d.map(function (d) { return { id: d.id, specialty_ru: nz(d.specialty_ru), specialty_uz: nz(d.specialty_uz), bio_ru: nz(d.bio_ru), bio_uz: nz(d.bio_uz) }; }))
+    .then(function () { I.busy = false; toast(T('Сохранено: сайт и бот покажут новые данные')); render(); })
+    .catch(function (e) { I.busy = false; render(); fail(e); });
+}
+
 /* ---------- резервная копия ---------- */
 function backupSave() {
   var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); };
@@ -152,6 +187,8 @@ function render() {
   view.innerHTML = tab === 'home' ? vHome(S, C) : tab === 'ops' ? vOps(S) : tab === 'pay' ? vPay(S) : tab === 'loan' ? vLoan(S) : tab === 'rep' ? vRep(S, C) : vSet(S);
   setStatus();
   rendering = false;
+  var fr = view.querySelector('[data-focus]');
+  if (fr) { var sc = fr.closest('.scroll'); if (sc) sc.scrollTop += fr.getBoundingClientRect().top - sc.getBoundingClientRect().top - 78; }
   if (keep) {
     var el = document.getElementById(keep.id); if (el) {
       el.focus({ preventScroll: true });
@@ -180,9 +217,11 @@ document.addEventListener('click', function (ev) {
   else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
   else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); }
   else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); }
-  else if (act === 'tab') { S.tab = id; try { localStorage.setItem('uzi-tab', S.tab); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); if (id === 'pay') loadClinic(); }
+  else if (act === 'tab') { S.tab = id; try { localStorage.setItem('uzi-tab', S.tab); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); if (id === 'pay') loadClinic(); if (id === 'set' && S.info.state !== 'ok') loadInfo(); }
   else if (act === 'type') { S.draft.type = id; S.draft.cat = CATS[id][0][0]; render(); }
-  else if (act === 'accrue') { if (!S.cfg.staff.length) return; mdoc(S.M).payroll = payCalc(S.cfg.staff, S.cfg.tax); saveMonth(S.M); toast(T('Зарплата за {m} начислена', { m: mName(S.M).toLowerCase() })); }
+  else if (act === 'info-save') saveInfo();
+  else if (act === 'loan-toggle') { S.loanOpen = !S.loanOpen; render(); }
+  else if (act === 'accrue') { if (!S.cfg.staff.length) return; if (S.cfg.staff.some(function (s) { return s.pct > 0; }) && S.clinic.state !== 'ok') { toast(T('Данные Ресепшена ещё не загружены: от них считается процент сотрудников')); return; } mdoc(S.M).payroll = payCalc(staffEff(S), S.cfg.tax); saveMonth(S.M); toast(T('Зарплата за {m} начислена', { m: mName(S.M).toLowerCase() })); }
   else if (act === 'unaccrue') { mdoc(S.M).payroll = null; saveMonth(S.M); }
   else if (act === 'add-staff') { S.cfg.staff.push({ id: uid(), name: '', role: '', salary: 0 }); saveCfg(); }
   else if (act === 'add-asset') { S.cfg.assets.push({ id: uid(), name: '', cost: 0, date: today(), life: 60, acct: 'bank' }); saveCfg(); }
@@ -198,6 +237,9 @@ document.addEventListener('input', function (ev) {
   if (el.dataset.kind === 'money') { var dg = el.value.replace(/\D/g, ''); el.value = dg ? Number(dg).toLocaleString('ru-RU') : ''; }
   if (el.dataset.kind === 'date') el.value = maskDate(el.value);
   if (el.dataset.d) S.draft[el.dataset.d] = el.dataset.kind === 'date' ? parseDate(el.value) : el.value;
+  if (el.dataset.info && S.info.s) S.info.s[el.dataset.info] = el.value;
+  if (el.dataset.iph !== undefined && S.info.s) { var pd = ev.inputType && ev.inputType.indexOf('delete') === 0; el.value = fmtPhoneInput(el.value, pd); S.info.s.ph[+el.dataset.iph] = el.value; }
+  if (el.dataset.idoc && S.info.d.length) { var pr = el.dataset.idoc.split(':'); S.info.d[+pr[0]][pr[1]] = el.value; }
   if (el.id === 'sync-email') S.sync.email = el.value;
   if (el.id === 'sync-pass') S.sync.pass = el.value;
 });
@@ -211,6 +253,8 @@ document.addEventListener('change', function (ev) {
     clinic.setPercent(el.dataset.pct, pv).then(loadClinic).catch(fail);
     return;
   }
+  if (el.dataset.days) { var dd = mdoc(S.M); dd.days = dd.days || {}; dd.days[el.dataset.days] = num(el.value); saveMonth(S.M); return; }
+  if (el.dataset.info === 'map_url' && S.info.s) { var mc = mapCoords(el.value); if (mc) { S.info.s.lat = mc.lat.replace('.', ','); S.info.s.lng = mc.lng.replace('.', ','); render(); } return; }
   var p = el.dataset.bind; if (!p) return;
   var k = el.dataset.kind, v = (k === 'money' || k === 'num') ? num(el.value) : el.value;
   if (k === 'date') {
@@ -222,6 +266,8 @@ document.addEventListener('change', function (ev) {
   var m = p.match(/^staff\.(\d+)\./); if (m && S.cfg.staff[m[1]]) delete S.cfg.staff[m[1]].example;
   writeCfg(); setTimeout(render, 0);
 });
+document.addEventListener('focusin', function (ev) { var el = ev.target; if (el.dataset && el.dataset.iph !== undefined && !el.value) { el.value = '+998 '; S.info.s.ph[+el.dataset.iph] = el.value; } });
+document.addEventListener('focusout', function (ev) { var el = ev.target; if (el.dataset && el.dataset.iph !== undefined && el.value.replace(/\D/g, '') === '998') { el.value = ''; S.info.s.ph[+el.dataset.iph] = ''; } });
 document.addEventListener('submit', function (ev) {
   if (ev.target.id !== 'opform') return; ev.preventDefault();
   var dr = S.draft, a = num(dr.amount); if (!a || a < 0) { toast(T('Введите сумму больше нуля')); return; }
@@ -248,10 +294,10 @@ registerSW({ immediate: true });
     S.sync.user = await sync.getUser();
     sync.onAuth(function (u) {
       var was = S.sync.user && S.sync.user.id;
-      S.sync.user = u; render();
+      S.sync.user = u; if (!u) S.info.state = 'idle'; render(); if (u && S.tab === 'set') loadInfo();
       if (u && (!was || was !== u.id)) { doSync(false); if (S.tab === 'pay') loadClinic(); }
     });
-    if (S.sync.user) { doSync(false); if (S.tab === 'pay') loadClinic(); } else render();
+    if (S.sync.user) { doSync(false); if (S.tab === 'pay') loadClinic(); if (S.tab === 'set') loadInfo(); } else render();
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - (S.sync.at || 0) > SYNC_EVERY) doSync(false); });
     window.addEventListener('online', function () { doSync(false); });
     setInterval(function () { if (document.visibilityState === 'visible' && navigator.onLine) doSync(false); }, SYNC_EVERY);

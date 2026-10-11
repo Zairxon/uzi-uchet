@@ -19,3 +19,17 @@ export function monthRange(ym) {
   const y = +ym.slice(0, 4), m = +ym.slice(5, 7);
   return { from: ym + '-01', to: ym + '-' + String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0') };
 }
+
+// Данные клиники для «Навбата» и бота: адрес, телефоны, карта, слоган, описание, врачи
+const SET_COLS = 'address,phones,map_url,lat,lng,slogan_ru,slogan_uz,about_ru,about_uz,perks_ru,perks_uz';
+export async function loadInfo() {
+  const a = await sb.from('clinic_settings').select(SET_COLS).eq('id', 1).single(); if (a.error) throw a.error;
+  const b = await sb.from('doctors').select('id,name,specialty_ru,specialty_uz,bio_ru,bio_uz').order('sort'); if (b.error) throw b.error;
+  return { s: a.data, d: b.data };
+}
+export async function saveInfo(s, docs) {
+  const a = await sb.from('clinic_settings').update(s).eq('id', 1); if (a.error) throw a.error;
+  for (const d of docs) {
+    const r = await sb.from('doctors').update({ specialty_ru: d.specialty_ru, specialty_uz: d.specialty_uz, bio_ru: d.bio_ru, bio_uz: d.bio_uz }).eq('id', d.id); if (r.error) throw r.error;
+  }
+}

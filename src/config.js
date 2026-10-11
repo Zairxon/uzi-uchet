@@ -5,7 +5,7 @@ export const SUPABASE_KEY = 'sb_publishable_EyHYtGPAe9ay86lCCW9ONA_VbbsHx4e';
 
 // Адреса приложений клиники: Главный, Ресепшен, Очередь
 export const APP_LINKS = {
-  main: 'https://zairxon.github.io/uzi-uchet/',
-  reception: 'https://zairxon.github.io/mitti-reception/',
-  queue: 'https://zairxon.github.io/mitti-booking/',
+  main: 'https://mitti-glavniy.vercel.app/',
+  reception: 'https://mitti-resepshen.vercel.app/',
+  queue: 'https://mitti-navbat.vercel.app/',
 };

@@ -28,3 +28,10 @@ export function merge(def, src) {
   });
   return o;
 }
+
+// Крупные суммы короче: 12 500 000 → «12,5 млн»
+export function fmtM(n) {
+  const a = Math.abs(n || 0);
+  if (a < 1e6) return fmt(n);
+  return (Math.round(n / 1e4) / 100).toString().replace('.', ',') + ' млн';
+}
