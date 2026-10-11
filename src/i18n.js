@@ -135,6 +135,8 @@ const UZ = {
   'Сохранить': 'Сақлаш',
   'Проверьте широту и долготу': 'Кенглик ва узунликни текширинг',
   'Сохранено: сайт и бот покажут новые данные': 'Сақланди: сайт ва бот янги маълумотни кўрсатади',
+  'Ориентир (русский)': 'Мўлжал (русча)',
+  'Ориентир (узбекский)': 'Мўлжал (ўзбекча)',
   'Статус': 'Ҳолати',
   'Оплаты берутся из «Операций» (проценты и основной долг по кредиту) и закрывают платежи по порядку. Жёлтым отмечены платежи этого и следующего месяца, красным — просроченные.': 'Тўловлар «Операциялар»дан (кредит фоизи ва асосий қарз) олинади ва тўловларни навбат билан ёпади. Сариқ — шу ва кейинги ойдаги, қизил — муддати ўтган тўловлар.',
   'Оклад, сум': 'Маош, сўм',
@@ -332,24 +334,33 @@ const UZ = {
   'Повреждены данные за {k}': '{k} учун маълумотлар бузилган',
 };
 
+import { cyr2lat } from './translit.js';
 let lang = 'ru';
-try { const s = localStorage.getItem('uzi-lang'); if (s === 'uz' || s === 'ru') lang = s; } catch (e) { /* без запоминания */ }
-if (typeof document !== 'undefined') document.documentElement.lang = lang === 'uz' ? 'uz-Cyrl' : 'ru';
+const cv = (x) => (lang === 'uzl' ? cyr2lat(x) : x);
+const htmlLang = () => (lang === 'uzl' ? 'uz-Latn' : lang === 'uz' ? 'uz-Cyrl' : 'ru');
+export const LANGS = [['ru', 'Русский', 'РУ'], ['uz', 'Ўзбекча', 'ЎЗ'], ['uzl', 'Oʻzbekcha', 'UZ']];
+// Двуязычные тексты из базы {ru, uz}: узбекский переводим в латиницу при необходимости
+export function pick(o) { if (!o) return ''; if (lang === 'ru') return o.ru || ''; return o.uz ? cv(o.uz) : (o.ru || ''); }
+export function pickList(o) { if (!o) return []; if (lang === 'ru') return o.ru || []; return o.uz && o.uz.length ? o.uz.map(cv) : (o.ru || []); }
+try { const s = localStorage.getItem('uzi-lang'); if (s === 'uz' || s === 'uzl' || s === 'ru') lang = s; } catch (e) { /* без запоминания */ }
+if (typeof document !== 'undefined') document.documentElement.lang = htmlLang();
 
 export function getLang() { return lang; }
 export function setLang(l) {
-  lang = l === 'uz' ? 'uz' : 'ru';
+  lang = l === 'uz' || l === 'uzl' ? l : 'ru';
   try { localStorage.setItem('uzi-lang', lang); } catch (e) { /* не страшно */ }
-  if (typeof document !== 'undefined') document.documentElement.lang = lang === 'uz' ? 'uz-Cyrl' : 'ru';
+  if (typeof document !== 'undefined') document.documentElement.lang = htmlLang();
 }
 export function t(key, p) {
-  let s = lang === 'uz' && UZ[key] !== undefined ? UZ[key] : key;
+  let s = lang !== 'ru' && UZ[key] !== undefined ? cv(UZ[key]) : key;
   if (p) s = s.replace(/\{(\w+)\}/g, (m, n) => (p[n] !== undefined ? p[n] : m));
-  if (lang === 'uz' && UZ[key] !== undefined && /^{m}/.test(UZ[key]) && s) s = s[0].toUpperCase() + s.slice(1);
+  if (lang !== 'ru' && UZ[key] !== undefined && /^{m}/.test(UZ[key]) && s) s = s[0].toUpperCase() + s.slice(1);
   return s;
 }
 const WD_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const WD_UZ = ['Ду', 'Се', 'Чо', 'Па', 'Жу', 'Ша', 'Як'];
-export function weekdays() { return lang === 'uz' ? WD_UZ : WD_RU; }
-export function months() { return lang === 'uz' ? MONTHS_UZ : MONTHS_RU; }
+export function weekdays() { return lang !== 'ru' ? WD_UZ.map(cv) : WD_RU; }
+export function months() { return lang !== 'ru' ? MONTHS_UZ.map(cv) : MONTHS_RU; }
 export const UZ_DICT = UZ;
+// Название клиники: в латинице пишется по-латински, всегда в кавычках
+export function brand() { return '«' + (lang === 'uzl' ? 'Mitti yurakcha' : 'Митти юракча') + '»'; }

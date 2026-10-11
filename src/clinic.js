@@ -21,7 +21,7 @@ export function monthRange(ym) {
 }
 
 // Данные клиники для «Навбата» и бота: адрес, телефоны, карта, слоган, описание, врачи
-const SET_COLS = 'address,phones,map_url,lat,lng,slogan_ru,slogan_uz,about_ru,about_uz,perks_ru,perks_uz';
+const SET_COLS = 'address,landmark_ru,landmark_uz,phones,map_url,lat,lng,slogan_ru,slogan_uz,about_ru,about_uz,perks_ru,perks_uz';
 export async function loadInfo() {
   const a = await sb.from('clinic_settings').select(SET_COLS).eq('id', 1).single(); if (a.error) throw a.error;
   const b = await sb.from('doctors').select('id,name,specialty_ru,specialty_uz,bio_ru,bio_uz').order('sort'); if (b.error) throw b.error;

@@ -248,7 +248,8 @@ export function vRep(S, C) {
   return nav + blocks[rv];
 }
 
-function lookBlock(S) {
+function lookBlock(S) { return ''; }
+function _lookOld(S) {
   var lang = getLang(), th = S.theme || 'auto';
   var btn = function (act, id, on, label) { return '<button type="button" data-act="' + act + '" data-id="' + id + '" aria-pressed="' + on + '">' + label + '</button>'; };
   return '<section><h2>' + t('Язык и тема') + '</h2><div class="panel">' +
@@ -306,7 +307,7 @@ function infoBlock(S) {
   if (I.state === 'error') return h + '<p class="alert">' + t('Не удалось получить данные клиники: {m}', { m: esc(I.msg) }) + '</p></section>';
   var s = I.s, f = function (label, key, ph, mode) { return '<label class="fld"><span>' + t(label) + '</span><input type="text" data-info="' + key + '"' + (mode ? ' inputmode="' + mode + '"' : '') + ' value="' + esc(s[key] || '') + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + '></label>'; };
   var ta = function (label, key, rows) { return '<label class="fld"><span>' + t(label) + '</span><textarea rows="' + (rows || 3) + '" data-info="' + key + '">' + esc(s[key] || '') + '</textarea></label>'; };
-  h += '<div class="panel">' + f('Адрес', 'address') +
+  h += '<div class="panel">' + f('Адрес', 'address') + f('Ориентир (русский)', 'landmark_ru') + f('Ориентир (узбекский)', 'landmark_uz') +
     '<div class="fld"><span>' + t('Телефоны') + '</span>' + [0, 1, 2].map(function (i) { return '<input type="text" inputmode="tel" data-iph="' + i + '" placeholder="+998 90 123 45 67" value="' + esc(fmtPhone(s.ph[i] || '')) + '">'; }).join('') + '</div>' +
     f('Ссылка на карту', 'map_url', 'https://yandex.com/maps/…') +
     '<div class="grid">' + f('Широта', 'lat', '41.311', 'decimal') + f('Долгота', 'lng', '69.279', 'decimal') + '</div>' +

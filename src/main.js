@@ -19,7 +19,7 @@ import * as store from './storage.js';
 import * as sync from './sync.js';
 import * as clinic from './clinic.js';
 import { fmtPhoneInput, cleanPhone } from './phone.js';
-import { t as T, getLang, setLang } from './i18n.js';
+import { t as T, getLang, setLang, brand } from './i18n.js';
 import { parseDate, maskDate, openCal, closeCal } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
 import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff } from './views.js';
@@ -43,6 +43,17 @@ function applyTheme(t) {
   S.theme = t;
 }
 applyTheme(getTheme());
+
+var SUN = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+var MOON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+function effDark() { var th = getTheme(); return th === 'dark' || (th === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
+function setChrome() {
+  var l = getLang(), lb = document.getElementById('langbtn'), tb = document.getElementById('themebtn'); if (!lb || !tb) return;
+  lb.textContent = l === 'ru' ? 'РУ' : l === 'uz' ? 'ЎЗ' : 'UZ';
+  document.querySelectorAll('#langmenu button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.id === l)); });
+  tb.innerHTML = effDark() ? SUN : MOON; tb.setAttribute('aria-label', T('Тема'));
+}
+document.addEventListener('click', function (ev) { var m = document.getElementById('langmenu'); if (m && !m.hidden && !ev.target.closest('#langmenu') && !ev.target.closest('#langbtn')) m.hidden = true; });
 document.getElementById('hero').src = heroUrl;
 
 /* ---------- storage ---------- */
@@ -133,7 +144,7 @@ function loadInfo() {
 function saveInfo() {
   var I = S.info, s = I.s, nz = function (x) { x = (x || '').trim(); return x ? x : null; }, lines = function (x) { return (x || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean); };
   var ll = function (x) { var n = parseFloat(String(x || '').replace(',', '.')); return isFinite(n) ? n : null; };
-  var row = { address: nz(s.address), phones: s.ph.map(cleanPhone).filter(Boolean), map_url: nz(s.map_url), lat: ll(s.lat), lng: ll(s.lng), slogan_ru: nz(s.slogan_ru), slogan_uz: nz(s.slogan_uz), about_ru: nz(s.about_ru), about_uz: nz(s.about_uz), perks_ru: lines(s.perks_ru_t), perks_uz: lines(s.perks_uz_t) };
+  var row = { address: nz(s.address), landmark_ru: nz(s.landmark_ru), landmark_uz: nz(s.landmark_uz), phones: s.ph.map(cleanPhone).filter(Boolean), map_url: nz(s.map_url), lat: ll(s.lat), lng: ll(s.lng), slogan_ru: nz(s.slogan_ru), slogan_uz: nz(s.slogan_uz), about_ru: nz(s.about_ru), about_uz: nz(s.about_uz), perks_ru: lines(s.perks_ru_t), perks_uz: lines(s.perks_uz_t) };
   if ((row.lat != null && Math.abs(row.lat) > 90) || (row.lng != null && Math.abs(row.lng) > 180)) { toast(T('Проверьте широту и долготу')); return; }
   I.busy = true; render();
   clinic.saveInfo(row, I.d.map(function (d) { return { id: d.id, specialty_ru: nz(d.specialty_ru), specialty_uz: nz(d.specialty_uz), bio_ru: nz(d.bio_ru), bio_uz: nz(d.bio_uz) }; }))
@@ -166,9 +177,9 @@ function backupLoad(file) {
 
 /* ---------- render ---------- */
 function applyStatic() {
-  var uz = getLang() === 'uz';
-  document.title = '«Митти юракча»: ' + T('Главный');
-  document.getElementById('hero-sub').textContent = T('Главный');
+  var uz = getLang() !== 'ru';
+  document.title = brand() + ': ' + T('Главный'); document.querySelector('.hero-title').textContent = brand();
+  document.getElementById('hero-sub').textContent = T('Главный'); setChrome();
   document.querySelector('[data-act=prev]').setAttribute('aria-label', T('Предыдущий месяц'));
   document.querySelector('[data-act=next]').setAttribute('aria-label', T('Следующий месяц'));
   applyTheme(getTheme());
@@ -213,7 +224,9 @@ document.addEventListener('click', function (ev) {
   }
   S.armed = null;
   if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); }
-  else if (act === 'lang-set') { setLang(id); render(); }
+  else if (act === 'lang-set') { setLang(id); document.getElementById('langmenu').hidden = true; render(); }
+  else if (act === 'lang-menu') { var lm = document.getElementById('langmenu'); lm.hidden = !lm.hidden; }
+  else if (act === 'theme-flip') { var nx = effDark() ? 'light' : 'dark'; try { localStorage.setItem('uzi-theme', nx); } catch (e) { /* не страшно */ } applyTheme(nx); render(); }
   else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
   else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); }
   else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); }

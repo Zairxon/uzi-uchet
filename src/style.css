@@ -388,3 +388,12 @@ td.stc{font-size:12px;white-space:nowrap}
 textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:9px 10px;width:100%;min-width:0;min-height:84px;resize:vertical;line-height:1.4}
 textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .fld input+input{margin-top:6px}
+
+/* ===== язык и тема: маленькие кнопки в правом углу баннера ===== */
+.hbtns{position:absolute;top:8px;right:8px;display:flex;gap:6px;z-index:4}
+.hbtn{font:600 11.5px var(--f-body);min-width:34px;height:28px;padding:0 9px;border-radius:14px;border:1px solid rgba(255,255,255,.6);background:rgba(30,12,4,.45);color:#fff;cursor:pointer;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:inline-flex;align-items:center;justify-content:center}
+.hbtn:hover{background:rgba(30,12,4,.65)}
+.langmenu{position:absolute;top:42px;right:8px;z-index:6;display:flex;flex-direction:column;min-width:130px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.28);overflow:hidden}
+.langmenu button{font:inherit;text-align:left;padding:10px 14px;border:0;background:none;color:var(--ink);cursor:pointer}
+.langmenu button[aria-pressed="true"]{background:var(--soft);font-weight:600;color:var(--accent)}
+.row.gaptop{margin-top:16px}
