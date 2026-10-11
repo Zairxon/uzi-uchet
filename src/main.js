@@ -20,6 +20,7 @@ import * as sync from './sync.js';
 import * as clinic from './clinic.js';
 import { fmtPhoneInput, cleanPhone } from './phone.js';
 import { t as T, getLang, setLang, brand } from './i18n.js';
+import { mountFooter } from './footer.js';
 import { parseDate, maskDate, openCal, closeCal } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
 import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff } from './views.js';
@@ -27,7 +28,7 @@ import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js
 
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
-  theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, info: { state: 'idle', s: null, d: [], msg: '', busy: false }, pp: { state: 'idle', s: null, svc: [], removed: [], setup: null, msg: '', busy: false }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
+  theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, info: { state: 'idle', s: null, d: [], msg: '', busy: false }, setTab: (function () { try { return localStorage.getItem('uzi-settab') || 'clinic'; } catch (e) { return 'clinic'; } })(), pp: { state: 'idle', s: null, svc: [], removed: [], setup: null, msg: '', busy: false }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
   draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
 };
 var db = false, ready = false, rendering = false;
@@ -197,7 +198,7 @@ function backupLoad(file) {
 function applyStatic() {
   var uz = getLang() !== 'ru';
   document.title = brand() + ': ' + T('Главный'); document.querySelector('.hero-title').textContent = brand();
-  document.getElementById('hero-sub').textContent = T('Главный'); setChrome();
+  document.getElementById('hero-sub').textContent = T('Главный'); setChrome(); mountFooter(T('Главный'));
   document.querySelector('[data-act=prev]').setAttribute('aria-label', T('Предыдущий месяц'));
   document.querySelector('[data-act=next]').setAttribute('aria-label', T('Следующий месяц'));
   applyTheme(getTheme());
@@ -250,6 +251,7 @@ document.addEventListener('click', function (ev) {
   else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); }
   else if (act === 'tab') { S.tab = id; try { localStorage.setItem('uzi-tab', S.tab); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); if (id === 'pay') loadClinic(); if (id === 'set' && S.info.state !== 'ok') loadInfo(); }
   else if (act === 'type') { S.draft.type = id; S.draft.cat = CATS[id][0][0]; render(); }
+  else if (act === 'set-tab') { S.setTab = id; try { localStorage.setItem('uzi-settab', id); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); }
   else if (act === 'info-save') saveInfo();
   else if (act === 'pp-save') savePrepay();
   else if (act === 'pp-add') { S.pp.svc.push({ id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : uid() + uid() + uid(), name_ru: '', name_uz: '', price: 0, percent: 30, fixed: '', active: true, sort: S.pp.svc.length + 1 }); render(); }

@@ -1,11 +1,17 @@
 import { defineConfig } from 'vite';
+
+// Время сборки: показывается внизу экрана, а version.json позволяет понять, что на сервере уже новее
+const BUILD = new Date().toISOString();
+const versionJson = () => ({ name: 'version-json', generateBundle() { this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ build: BUILD }) }); } });
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: './',
   build: { target: 'es2020' },
+  define: { __BUILD__: JSON.stringify(BUILD) },
   test: { environment: 'node', include: ['test/**/*.test.js'] },
   plugins: [
+    versionJson(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/favicon.png', 'icons/apple-touch-icon.png'],

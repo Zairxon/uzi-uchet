@@ -337,20 +337,24 @@ function prepayBlock(S) {
       '<div class="row"><span class="chip ok">' + t('Клиент внесёт вперёд') + ': ' + fmt(dep) + ' ' + t('сум') + '</span><button class="btn ghost danger small" data-act="pp-del" data-id="' + i + '">' + t('Удалить услугу') + '</button></div></div>';
   }).join('') : '<p class="empty">' + t('Пока нет услуг: предоплата выключена.') + '</p>') +
     '<div class="row gaptop"><button class="btn ghost" data-act="pp-add">' + t('Добавить услугу очереди') + '</button></div>';
-  if (P.setup) h += '<div class="panel"><b>' + t('Чеки в Telegram для сотрудников') + '</b><p class="small">' + t('Чтобы чеки приходили в Telegram, сотрудник отправляет боту команду: {c}', { c: '<code>/staff ' + esc(P.setup.code) + '</code>' }) + '</p><p class="small muted">' + t('Подключено чатов: {n}', { n: P.setup.chats }) + '</p></div>';
+  if (P.setup) h += '<div class="panel"><b>' + t('Чеки в Telegram для сотрудников') + '</b><p class="small">' + t('Нажмите, чтобы чеки приходили вам в Telegram:') + '</p><div class="row"><a class="btn" href="https://t.me/mittiyurakcha_bot?start=staff_' + esc(P.setup.code) + '" target="_blank" rel="noopener">' + t('Подключить Telegram') + '</a></div><p class="small muted">' + t('Или отправьте боту команду: {c}', { c: '<code>/staff ' + esc(P.setup.code) + '</code>' }) + '</p><p class="small muted">' + t('Подключено чатов: {n}', { n: P.setup.chats }) + '</p></div>';
   return h + '<div class="row"><button class="btn" data-act="pp-save"' + (P.busy ? ' disabled' : '') + '>' + t('Сохранить') + '</button></div></section>';
 }
 
 export function vSet(S) {
   var tx = S.cfg.tax;
-  return '<section><h2>' + t('Налоговый режим') + '</h2><div class="panel"><label class="fld"><span>' + t('Как фирма платит налог') + '</span>' +
+  var tab = S.setTab || 'clinic';
+  var tabs = '<div class="seg four settabs" role="tablist">' + [['clinic', 'Клиника'], ['prepay', 'Предоплата'], ['tax', 'Налоги'], ['data', 'Данные']].map(function (x) { return '<button type="button" data-act="set-tab" data-id="' + x[0] + '" aria-pressed="' + (tab === x[0]) + '">' + t(x[1]) + '</button>'; }).join('') + '</div>';
+  var taxHtml = '<section><h2>' + t('Налоговый режим') + '</h2><div class="panel"><label class="fld"><span>' + t('Как фирма платит налог') + '</span>' +
     sel('f-tax-regime', [['turnover', 'Налог с оборота (выручка до 1 млрд сум в год)'], ['profit', 'Налог на прибыль (выручка выше 1 млрд сум)']], tx.regime, 'data-bind="tax.regime" data-kind="text"') + '</label>' +
     '<div class="grid">' + inp(S, t('Налог с оборота, %'), 'tax.turnover', 'num') + inp(S, t('Налог на прибыль, %'), 'tax.profit', 'num') + '</div></div></section>' +
     '<section><h2>' + t('Ставки с зарплаты') + '</h2><div class="panel"><div class="grid">' + inp(S, t('НДФЛ, %'), 'tax.ndfl', 'num') + inp(S, t('ИНПС, %'), 'tax.inps', 'num') + inp(S, t('Социальный налог, %'), 'tax.soc', 'num') + '</div></div>' +
     '<p class="note">' + t('Ставки по умолчанию взяты на 2026 год и сверены 10.10.2026. Налог на прибыль считается упрощённо, от прибыли каждого месяца. Перед сдачей отчётности сверяйте суммы с бухгалтером и my.soliq.uz: программа ведёт внутренний учёт и официальную отчётность не заменяет.') + '</p></section>' +
-    infoBlock(S) + prepayBlock(S) + syncBlock(S) + appsBlock() +
+    '';
+  var dataHtml = syncBlock(S) + appsBlock() +
     '<section><h2>' + t('Резервная копия') + '</h2><div class="panel">' +
     '<div class="row"><button class="btn" data-act="backup-save">' + t('Скачать резервную копию') + '</button><button class="btn ghost" data-act="backup-load">' + t('Загрузить из копии') + '</button></div>' +
     '<input id="backup-file" type="file" accept="application/json,.json" hidden></div>' +
     '<p class="note">' + t('Данные хранятся только на этом устройстве, в памяти браузера. Скачивайте копию регулярно и перед очисткой данных браузера. Загрузка из копии полностью заменяет текущие данные.') + '</p></section>' + lookBlock(S);
+  return tabs + (tab === 'clinic' ? infoBlock(S) : tab === 'prepay' ? prepayBlock(S) : tab === 'tax' ? taxHtml : dataHtml);
 }
