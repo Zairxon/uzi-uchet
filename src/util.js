@@ -4,7 +4,7 @@ export const DEF = {
   tax: { regime: 'turnover', turnover: 4, profit: 15, ndfl: 12, inps: 0.1, soc: 12 },
   staff: [],
   assets: [],
-  loan: { amount: 0, rate: 15, term: 84, grace: 24, start: '' },
+  loan: { amount: 0, rate: 15, term: 84, grace: 24, start: '', purpose: '', purposeNote: '' },
   rent: { amount: 0, start: '', area: 117.37, minRate: 28400 },
 };
 

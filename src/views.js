@@ -10,9 +10,12 @@ import { fmtPhone } from './phone.js';
 export const TABS = [['home', 'Обзор'], ['ops', 'Операции'], ['pay', 'Зарплата'], ['loan', 'Кредит и аренда'], ['rep', 'Отчёты'], ['set', 'Настройки']];
 export const CATS = {
   income: [['usl', 'Услуги УЗИ'], ['other_inc', 'Прочий доход'], ['contrib', 'Взнос учредителя']],
-  expense: [['supplies', 'Расходные материалы'], ['util', 'Коммунальные и связь'], ['ads', 'Реклама'], ['repair', 'Обслуживание техники'], ['repair_bld', 'Ремонт здания (поломки)'], ['bank', 'Банковские комиссии'], ['other', 'Прочие расходы'],
+  expense: [['supplies', 'Расходные материалы'], ['util', 'Коммунальные и связь'], ['ads', 'Реклама'], ['equip', 'Покупка техники'], ['repair', 'Обслуживание техники'], ['repair_bld', 'Ремонт здания (поломки)'], ['bank', 'Банковские комиссии'], ['other', 'Прочие расходы'],
     ['pay_sal', 'Выплата зарплаты'], ['pay_ptax', 'Налоги с зарплаты'], ['pay_rent', 'Оплата аренды (с НДФЛ)'], ['pay_int', 'Проценты по кредиту'], ['pay_princ', 'Основной долг по кредиту'], ['pay_tax', 'Налог с оборота или прибыли'], ['dividend', 'Выплата учредителю']],
 };
+export const ACCTS = [['cash', 'Касса (наличные)'], ['card', 'Касса (карта)'], ['founder', 'Учредитель'], ['transfer', 'Перечисление']];
+const ACCTNAME = { cash: 'касса (нал.)', card: 'касса (карта)', founder: 'учредитель', transfer: 'перечисление', bank: 'банк' };
+const ROLES = ['Администратор', 'Медсестра', 'Кассир', 'Бухгалтер', 'Уборщица', 'Охранник', 'Другое'];
 const OPEX = ['supplies', 'util', 'ads', 'repair', 'repair_bld', 'bank', 'other'];
 const CATNAME = {}; CATS.income.concat(CATS.expense).forEach(function (c) { CATNAME[c[0]] = c[1]; });
 const lc = function (M) { return mName(M).toLowerCase(); };
@@ -39,9 +42,23 @@ function tr(label, vals, cls) { return '<tr class="' + (cls || '') + '"><td clas
 function delBtn(S, act, id) { var on = S.armed === act + id; return '<button class="btn del' + (on ? ' armed' : '') + '" data-act="' + act + '" data-id="' + esc(id) + '" aria-label="' + t('Удалить') + '">' + (on ? t('Удалить?') : '×') + '</button>'; }
 
 /* ---------- views ---------- */
+// Итоги дня по внесённым операциям (приём из «Ресепшена» вносится в учёт автоматически)
+function dayFigures(S, d) {
+  var ops = ((S.months[ymOf(d)] && S.months[ymOf(d)].ops) || []).filter(function (o) { return o.d === d; }), inc = 0, exp = 0;
+  ops.forEach(function (o) { if (o.t === 'income') { if (o.c !== 'contrib') inc += o.a || 0; } else exp += o.a || 0; });
+  return { inc: inc, exp: exp, net: inc - exp, ops: ops };
+}
+function kpi3(f) {
+  return '<div class="kpis three"><div class="kpi"><span>' + t('Выручка') + '</span><b class="pos">' + fmt(f.inc) + '</b></div><div class="kpi"><span>' + t('Расход') + '</span><b class="neg">' + fmt(f.exp) + '</b></div><div class="kpi"><span>' + t('Чистая прибыль') + '</span><b class="' + (f.net < 0 ? 'neg' : 'pos') + '">' + fmt(f.net) + '</b></div></div>';
+}
+function todayBlock(S) {
+  var d = today(), f = dayFigures(S, d);
+  return '<section class="todaybox"><h2>' + t('Сегодня, {d}', { d: fmtDate(d) }) + '</h2>' + kpi3(f) + '<p class="small muted">' + t('Выручка включает приём из «Ресепшена». Прибыль дня = выручка минус расходы по внесённым операциям; зарплата и налоги считаются за месяц.') + '</p></section>';
+}
+
 export function vHome(S, C) {
   var M = S.M, r = C.cur, B = C.B, exp = r.opexSum + r.payroll + r.rent + r.int + r.dep + r.tax;
-  var h = '<section><div class="kpis">' +
+  var h = todayBlock(S) + '<section><h2>' + t('За {m}', { m: lc(M) }) + '</h2><div class="kpis">' +
     '<div class="kpi"><span>' + t('Выручка') + '</span><b>' + fmt(r.rev) + '</b></div>' +
     '<div class="kpi"><span>' + t('Расходы и налог') + '</span><b>' + fmt(exp) + '</b></div>' +
     '<div class="kpi"><span>' + t('Чистая прибыль') + '</span><b class="' + (r.net < 0 ? 'neg' : 'pos') + '">' + fmt(r.net) + '</b></div>' +
@@ -66,29 +83,89 @@ function opTime(o) {
   try { return new Date(n).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tashkent' }); } catch (e) { return ''; }
 }
 
+function opRow(S, o, canDel) {
+  var rc = String(o.id).indexOf('rc:') === 0, name = rc ? (o.id.split(':')[3] === 'deposit' ? t('Ресепшен: предоплаты ({n})', { n: o.cnt || '' }) : t('Ресепшен: приём ({n})', { n: o.cnt || '' })) : (CATNAME[o.c] ? t(CATNAME[o.c]) : o.c);
+  return '<li><div class="li-main"><b>' + esc(name) + (rc ? ' <span class="chip">' + t('авто') + '</span>' : '') + '</b><span class="small muted">' + (opTime(o) ? opTime(o) + ' · ' : '') + t(ACCTNAME[o.acct] || 'касса') + (o.n ? ' · ' + esc(o.n) : '') + '</span></div><span class="num ' + (o.t === 'income' ? 'pos' : 'neg') + '">' + (o.t === 'income' ? '+' : '−') + fmt(o.a) + '</span>' + (canDel && !rc ? delBtn(S, 'del-op', o.id) : '') + '</li>';
+}
+var METHNAME = { cash: 'наличные', card: 'карта', transfer: 'перечисление' };
+// Пациенты из «Ресепшена» за выбранный день
+function rcBlock(S, day) {
+  var R = S.dayRc, h = '<div class="rcbox"><h3>🏥 ' + t('Из «Ресепшена»: пациенты дня') + '</h3>';
+  if (!S.sync.enabled || !S.sync.user) return h + '<p class="small muted">' + t('Войдите в «Настройки → Данные» (синхронизация), чтобы видеть пациентов из «Ресепшена».') + '</p></div>';
+  if (R.state === 'loading' || R.state === 'idle') return h + '<p class="small muted">' + t('Загрузка…') + '</p></div>';
+  if (R.state === 'error') return h + '<p class="small muted">' + t('Не удалось получить данные клиники: {m}', { m: esc(R.msg) }) + '</p></div>';
+  if (!R.rows.length) return h + '<p class="small muted">' + t('В этот день оплат из «Ресепшена» не было.') + '</p></div>';
+  var sum = 0, vis = 0;
+  R.rows.forEach(function (x) { sum += +x.amount; if (x.kind === 'visit') vis++; });
+  h += '<ul class="list">' + R.rows.map(function (x) {
+    return '<li><div class="li-main"><b>' + esc(x.client_name || '—') + '</b><span class="small muted">' + esc(x.at) + ' · ' + esc(x.doctor_name || '') + (x.service ? ' · ' + esc(x.service) : '') + (x.finished ? ' · ✔ ' + t('прошёл') : '') + '</span></div>' +
+      '<span class="rcm">' + (x.kind === 'deposit' ? '💳 ' + t('предоплата') : t(METHNAME[x.method] || 'наличные')) + '</span><span class="num pos">+' + fmt(x.amount) + '</span></li>';
+  }).join('') + '</ul><p class="small"><b>' + t('Пациентов: {n}', { n: vis }) + '</b> · ' + t('Поступило: {s} сум', { s: '<span class="num">' + fmt(sum) + '</span>' }) + '</p></div>';
+  return h;
+}
+
 export function vOps(S) {
-  var months_ = S.months, M = S.M, draft = S.draft;
-  var ops = ((months_[M] && months_[M].ops) || []).slice().sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : opTs(b) - opTs(a); });
+  var months_ = S.months, M = S.M, draft = S.draft, day = S.opsDay || today();
   var cats = CATS[draft.type]; if (!cats.some(function (c) { return c[0] === draft.cat; })) draft.cat = cats[0][0];
+  var sorter = function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : opTs(b) - opTs(a); };
   var h = '<section><h2>' + t('Новая операция') + '</h2><form class="panel" id="opform" novalidate>' +
     '<div class="seg"><button type="button" data-act="type" data-id="income" aria-pressed="' + (draft.type === 'income') + '">' + t('Поступление') + '</button><button type="button" data-act="type" data-id="expense" aria-pressed="' + (draft.type === 'expense') + '">' + t('Списание') + '</button></div>' +
     '<div class="grid">' +
     '<label class="fld"><span>' + t('Дата') + '</span>' + dateField('<input id="op-date" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="' + esc(t('дд.мм.гггг')) + '" data-d="date" data-kind="date" value="' + esc(fmtDate(draft.date)) + '">', 'op-date') + '</label>' +
     '<label class="fld"><span>' + t('Сумма, сум') + '</span><input id="op-amount" type="text" inputmode="numeric" class="n" data-d="amount" data-kind="money" value="' + esc(draft.amount) + '" placeholder="0"></label>' +
     '<label class="fld"><span>' + t('Категория') + '</span>' + sel('op-cat', cats, draft.cat, 'data-d="cat"') + '</label>' +
-    '<label class="fld"><span>' + t('Счёт') + '</span>' + sel('op-acct', [['cash', 'Касса (наличные)'], ['bank', 'Банк (карта, перечисление)']], draft.acct, 'data-d="acct"') + '</label>' +
-    '</div><label class="fld"><span>' + t('Комментарий') + '</span><input id="op-note" type="text" data-d="note" value="' + esc(draft.note) + '" placeholder="' + esc(t('Например: выручка за день, 14 пациентов')) + '"></label>' +
-    '<div class="row"><button class="btn" type="submit">' + t('Добавить') + '</button></div></form>' +
-    '<p class="note">' + t('Зарплата, аренда, проценты и амортизация попадают в расходы автоматически из вкладок «Зарплата» и «Кредит и аренда». Здесь записывайте их оплату: она уменьшает деньги и долг, но второй раз расходом не считается.') + '</p></section>';
-  h += '<section><h2>' + t('Операции за {m}', { m: lc(M) }) + '</h2>';
-  if (!ops.length) h += '<p class="empty">' + t('Пока нет записей. Добавьте первое поступление или списание в форме выше.') + '</p>';
+    '<label class="fld"><span>' + t('Счёт') + '</span>' + sel('op-acct', ACCTS, draft.acct, 'data-d="acct"') + '</label>' +
+    '</div><label class="fld"><span>' + t('Комментарий') + '</span><input id="op-note" type="text" data-d="note" value="' + esc(draft.note) + '" placeholder="' + esc(t(draft.cat === 'equip' ? 'Название и модель, например: УЗИ-аппарат Миндрей ДС-70' : 'Например: закупка расходников')) + '"></label>' +
+    (draft.cat === 'equip' ? '<p class="note">' + t('Купленная техника записывается как имущество и списывается в расходы по частям (60 месяцев). В «Кредит и аренда» её можно выбрать как цель кредита.') + '</p>' : '') +
+    (draft.acct === 'founder' ? '<p class="note">' + t('«Учредитель»: оплата из личных денег учредителя. Деньги клиники не меняются, сумма записывается как вклад учредителя.') + '</p>' : '') +
+    '<div class="row gaptop"><button class="btn" type="submit">' + t('Добавить') + '</button></div></form>' +
+    '<p class="note">' + t('Выручка с приёма вносится из «Ресепшена» автоматически: вручную записывайте только прочие поступления и все расходы. Зарплата, аренда, проценты и амортизация попадают в расходы из вкладок «Зарплата» и «Кредит и аренда»; здесь записывайте их оплату.') + '</p></section>';
+  // день
+  var f = dayFigures(S, day), dops = f.ops.filter(function (o) { return String(o.id).indexOf('rc:') !== 0; }).sort(sorter), isToday = day === today();
+  h += '<section class="opsday"><h2>' + t('Операции за день') + '</h2>' +
+    '<div class="daynav2"><button type="button" class="navbtn" data-act="ops-prev" aria-label="' + esc(t('Предыдущий день')) + '">‹</button><button type="button" class="daylabel2" data-act="ops-today">' + (isToday ? t('Сегодня') + ' · ' : '') + esc(fmtDate(day)) + '</button><button type="button" class="navbtn" data-act="ops-next" aria-label="' + esc(t('Следующий день')) + '">›</button></div>' +
+    kpi3(f) + rcBlock(S, day) +
+    '<h3 class="subh">' + t('Остальные операции дня') + '</h3>' + (dops.length ? '<ul class="list">' + dops.map(function (o) { return opRow(S, o, true); }).join('') + '</ul>' : '<p class="empty">' + t('Других операций в этот день нет.') + '</p>') + '</section>';
+  // месяц
+  var mops = ((months_[M] && months_[M].ops) || []).slice().sort(sorter), mi = 0, me = 0;
+  mops.forEach(function (o) { if (o.t === 'income') { if (o.c !== 'contrib') mi += o.a || 0; } else me += o.a || 0; });
+  h += '<section class="opsmonth"><h2>' + t('Операции за {m}', { m: lc(M) }) + '</h2>' + kpi3({ inc: mi, exp: me, net: mi - me });
+  if (!mops.length) h += '<p class="empty">' + t('Пока нет записей. Добавьте первое поступление или списание в форме выше.') + '</p>';
   else {
-    h += '<ul class="list">'; var day = ''; ops.forEach(function (o) {
-      if (o.d !== day) { day = o.d; h += '<li class="day" style="border-bottom:0;padding-bottom:0">' + esc(o.d.slice(8, 10) + '.' + o.d.slice(5, 7)) + '</li>'; }
-      h += '<li><div class="li-main"><b>' + esc(CATNAME[o.c] ? t(CATNAME[o.c]) : o.c) + '</b><span class="small muted">' + (opTime(o) ? opTime(o) + ' · ' : '') + (o.acct === 'bank' ? t('банк') : t('касса')) + (o.n ? ' · ' + esc(o.n) : '') + '</span></div><span class="num ' + (o.t === 'income' ? 'pos' : 'neg') + '">' + (o.t === 'income' ? '+' : '−') + fmt(o.a) + '</span>' + delBtn(S, 'del-op', o.id) + '</li>';
+    h += '<ul class="list">'; var dd = ''; mops.forEach(function (o) {
+      if (o.d !== dd) { dd = o.d; h += '<li class="day" style="border-bottom:0;padding-bottom:0">' + esc(o.d.slice(8, 10) + '.' + o.d.slice(5, 7)) + '</li>'; }
+      h += opRow(S, o, true);
     }); h += '</ul>';
   }
   return h + '</section>';
+}
+
+function dmapOf(S) { return (S.months[S.M] && S.months[S.M].days) || {}; }
+function staffScheme(s) {
+  var p = []; if (s.salary) p.push(t('оклад') + ' ' + fmt(s.salary)); if (s.daily) p.push(fmt(s.daily) + ' / ' + t('день')); if (s.pct) p.push(String(s.pct).replace('.', ',') + '%');
+  return p.length ? p.join(' + ') : t('оплата не задана');
+}
+// Ячейка «Сотрудники клиники»: нажмите, чтобы увидеть всех (врачи из «Ресепшена» и персонал), добавить и изменить
+function staffCell(S, dmap) {
+  var cfg = S.cfg, open = !!S.staffOpen, docs = S.clinic && S.clinic.state === 'ok' ? S.clinic.rows : [];
+  var h = '<button type="button" class="cell" data-act="staff-toggle" aria-expanded="' + open + '"><span class="ci">👥</span><span class="cb"><b>' + t('Сотрудники клиники') + '</b><span class="small muted">' + t('Врачей: {a} · персонала: {b}', { a: docs.length, b: cfg.staff.length }) + '</span></span><svg class="chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>';
+  if (!open) return h;
+  h += '<div class="panel stafflist"><h3 class="subh">' + t('Врачи (из «Ресепшена»)') + '</h3>' + (docs.length ? '<ul class="list">' + docs.map(function (d) { return '<li><div class="li-main"><b>' + esc(d.doctor_name) + '</b><span class="small muted">' + t('врач') + ' · ' + t('доля {n}%', { n: String(+d.percent || 0).replace('.', ',') }) + '</span></div></li>'; }).join('') + '</ul>' : '<p class="small muted">' + t('Список врачей появится после входа в «Настройки → Данные» и загрузки данных клиники. Процент врачей задаётся ниже, в «Доле врачей».') + '</p>') +
+    '<h3 class="subh">' + t('Персонал') + '</h3>';
+  if (!cfg.staff.length) h += '<p class="small muted">' + t('Пока никого нет. Добавьте медсестёр, администратора и других сотрудников: от них считается зарплата.') + '</p>';
+  cfg.staff.forEach(function (s, i) {
+    var edit = S.editStaff === s.id;
+    h += '<div class="srow"><div class="li-main"><b>' + esc(s.name || t('Без имени')) + '</b><span class="small muted">' + esc(t(s.role || 'Другое')) + ' · ' + staffScheme(s) + '</span></div><button type="button" class="btn ghost small" data-act="staff-edit" data-id="' + esc(s.id) + '">' + t(edit ? 'Готово' : 'Изменить') + '</button></div>';
+    if (edit) {
+      var ro = ROLES.map(function (x) { return [x, x]; }); if (s.role && ROLES.indexOf(s.role) < 0) ro.push([s.role, s.role]);
+      h += '<div class="staff2"><div class="grid">' + inp(S, t('Имя'), 'staff.' + i + '.name', 'text') + '<label class="fld"><span>' + t('Должность') + '</span>' + sel('f-staff-' + i + '-role', ro, s.role || ROLES[0], 'data-bind="staff.' + i + '.role" data-kind="text"') + '</label>' +
+        inp(S, t('Оклад, сум'), 'staff.' + i + '.salary', 'money') + inp(S, t('Оплата за день, сум'), 'staff.' + i + '.daily', 'money') + inp(S, t('Процент от оплат клиники, %'), 'staff.' + i + '.pct', 'num') +
+        '<label class="fld"><span>' + t('Дней в этом месяце') + '</span><input id="f-days-' + esc(s.id) + '" data-days="' + esc(s.id) + '" type="text" inputmode="decimal" class="n" value="' + esc(String(dmap[s.id] || '').replace('.', ',')) + '" placeholder="0"></label></div>' +
+        '<div class="row">' + delBtn(S, 'del-staff', s.id) + '</div></div>';
+    }
+  });
+  return h + '<div class="row gaptop"><button class="btn ghost" data-act="add-staff">' + t('Добавить сотрудника') + '</button></div>' +
+    '<p class="note">' + t('Итог сотрудника = оклад + оплата за день × число дней + процент от оплат клиники за {m} ({s} сум, данные «Ресепшена»). Для медсестёр и других сотрудников без оклада заполните только нужные поля.', { m: lc(S.M), s: fmt(clinicBase(S)) }) + '</p></div>';
 }
 
 // Сумма оплат клиники за месяц (данные Ресепшена) — основа для процента сотрудников
@@ -127,19 +204,7 @@ export function vPay(S) {
       '<div class="row">' + (p ? '<button class="btn ghost" data-act="unaccrue">' + t('Отменить начисление') + '</button>' : '<button class="btn" data-act="accrue">' + t('Начислить за {m}', { m: lc(M) }) + '</button>') + '</div>' +
       '<p class="note">' + (p ? t('Расчёт зафиксирован и попал в расходы месяца. Изменения в списке сотрудников на него не влияют.') : t('Пока это предварительный расчёт. После начисления сумма попадёт в расходы месяца и в долг по зарплате.')) + ' ' + t('ИНПС {n}% идёт на пенсионный счёт сотрудника из суммы НДФЛ, поэтому на руки он не влияет.', { n: String(tx.inps).replace('.', ',') }) + '</p>';
   }
-  h += '</section><section><h2>' + t('Сотрудники') + '</h2>';
-  if (cfg.staff.length) {
-    var dmap = (months_[M] && months_[M].days) || {};
-    h += '<div class="panel">' + cfg.staff.map(function (s, i) {
-      return '<div class="staff2"><div class="grid">' + inp(S, t('Имя') + (s.example ? ' <span class="chip">' + t('пример') + '</span>' : ''), 'staff.' + i + '.name', 'text') + inp(S, t('Должность'), 'staff.' + i + '.role', 'text') +
-        inp(S, t('Оклад, сум'), 'staff.' + i + '.salary', 'money') + inp(S, t('Оплата за день, сум'), 'staff.' + i + '.daily', 'money') +
-        inp(S, t('Процент от оплат клиники, %'), 'staff.' + i + '.pct', 'num') +
-        '<label class="fld"><span>' + t('Дней в этом месяце') + '</span><input id="f-days-' + esc(s.id) + '" data-days="' + esc(s.id) + '" type="text" inputmode="decimal" class="n" value="' + esc(String(dmap[s.id] || '').replace('.', ',')) + '" placeholder="0"></label></div>' +
-        '<div class="row">' + delBtn(S, 'del-staff', s.id) + '</div></div>';
-    }).join('') + '</div>' +
-      '<p class="note">' + t('Итог сотрудника = оклад + оплата за день × число дней + процент от оплат клиники за {m} ({s} сум, данные «Ресепшена»). Для медсестёр и других сотрудников без оклада заполните только нужные поля.', { m: lc(M), s: fmt(clinicBase(S)) }) + '</p>';
-  }
-  h += '<div class="row"><button class="btn ghost" data-act="add-staff">' + t('Добавить сотрудника') + '</button></div></section>';
+  h += '</section><section><h2>' + t('Сотрудники') + '</h2>' + staffCell(S, dmapOf(S)) + '</section>';
   return h + shareBlock(S);
 }
 
@@ -172,11 +237,25 @@ function loanSched(S, SC, l) {
   return h;
 }
 
+// На что взят кредит: оборудование из списка, техника из «Операций» или другое (с моделью)
+function loanPurpose(S, l) {
+  var opts = [['', '— не указано —']], info = {};
+  S.cfg.assets.forEach(function (a) { var lbl = 'Оборудование: ' + (a.name || 'без названия') + (a.model ? ' (' + a.model + ')' : ''); opts.push(['asset:' + a.id, lbl]); info['asset:' + a.id] = { name: (a.name || '') + (a.model ? ' (' + a.model + ')' : ''), cost: a.cost, date: a.date }; });
+  Object.keys(S.months).sort().forEach(function (m) { ((S.months[m] && S.months[m].ops) || []).forEach(function (o) { if (o.t === 'expense' && o.c === 'equip') { opts.push(['op:' + o.id, 'Покупка техники: ' + (o.n || 'без названия') + ' · ' + fmtDate(o.d)]); info['op:' + o.id] = { name: o.n || '', cost: o.a, date: o.d }; } }); });
+  opts.push(['other', 'Другое']);
+  var cur = info[l.purpose];
+  return '<div class="panel"><b>' + t('На что взят кредит') + '</b><div class="fld"><span>' + t('Цель кредита') + '</span>' + sel('f-loan-purpose', opts, l.purpose || '', 'data-bind="loan.purpose" data-kind="text"') + '</div>' +
+    inp(S, t('Что именно, модель'), 'loan.purposeNote', 'text') +
+    (cur ? '<p class="small muted">' + t('Связано с операцией или оборудованием: {n}, {c} сум ({d}).', { n: esc(cur.name), c: fmt(cur.cost), d: fmtDate(cur.date) }) + '</p>' : '') +
+    '<p class="note">' + t('Список берётся из «Оборудование и ремонт» ниже и из операций «Покупка техники»: так кредит связан с купленной вещью.') + '</p></div>';
+}
+
 export function vLoan(S) {
   var cfg = S.cfg, M = S.M;
   var l = cfg.loan, r = cfg.rent, SC = sched(l, ymOf(l.start) || M), tot = 0; SC.forEach(function (x) { tot += x.int; });
   var h = '<section><h2>' + t('Кредит') + '</h2><div class="panel"><div class="grid">' + inp(S, t('Сумма, сум'), 'loan.amount', 'money') + inp(S, t('Ставка, % годовых'), 'loan.rate', 'num') + inp(S, t('Срок, месяцев'), 'loan.term', 'num') + inp(S, t('Льготный период, месяцев'), 'loan.grace', 'num') + inp(S, t('Дата получения'), 'loan.start', 'date') + '</div>' +
     (l.start ? '' : '<p class="alert">' + t('Дата получения не указана: график показан для примера и в отчёты не попадает.') + '</p>') + '</div>';
+  h += loanPurpose(S, l);
   if (SC.length) {
     var fp = SC[Math.min(SC.length - 1, l.grace)];
     h += '<ul class="list"><li><div class="li-main"><b>' + t('Платёж в льготный период') + '</b><span class="small muted">' + t('только проценты') + '</span></div><span class="num">' + fmt(SC[0].int) + '</span></li>' +
@@ -196,12 +275,12 @@ export function vLoan(S) {
   h += '<section><h2>' + t('Оборудование и ремонт') + '</h2>';
   if (!cfg.assets.length) h += '<p class="empty">' + t('Добавьте аппараты УЗИ, мебель и ремонт помещения. Их стоимость будет списываться в расходы по частям каждый месяц.') + '</p>';
   else h += '<div class="panel">' + cfg.assets.map(function (a, i) {
-    return '<div class="grid">' + inp(S, t('Название'), 'assets.' + i + '.name', 'text', 'full') + inp(S, t('Стоимость, сум'), 'assets.' + i + '.cost', 'money') + inp(S, t('Дата покупки'), 'assets.' + i + '.date', 'date') + inp(S, t('Срок службы, месяцев'), 'assets.' + i + '.life', 'num') +
-      '<label class="fld"><span>' + t('Оплачено') + '</span>' + sel('f-assets-' + i + '-acct', [['bank', 'с банка'], ['cash', 'из кассы']], a.acct || 'bank', 'data-bind="assets.' + i + '.acct" data-kind="text"') + '</label>' +
+    return '<div class="grid">' + inp(S, t('Название'), 'assets.' + i + '.name', 'text', 'full') + inp(S, t('Модель'), 'assets.' + i + '.model', 'text', 'full') + inp(S, t('Стоимость, сум'), 'assets.' + i + '.cost', 'money') + inp(S, t('Дата покупки'), 'assets.' + i + '.date', 'date') + inp(S, t('Срок службы, месяцев'), 'assets.' + i + '.life', 'num') +
+      '<label class="fld"><span>' + t('Оплачено') + '</span>' + sel('f-assets-' + i + '-acct', [['transfer', 'Перечисление'], ['card', 'Касса (карта)'], ['cash', 'Касса (наличные)'], ['founder', 'Учредитель']], a.acct || 'transfer', 'data-bind="assets.' + i + '.acct" data-kind="text"') + '</label>' +
       '<div class="fld"><span>' + t('В месяц в расходы') + '</span><div class="row"><span class="num">' + fmt((a.cost || 0) / Math.max(1, a.life || 1)) + '</span>' + delBtn(S, 'del-asset', a.id) + '</div></div></div>';
   }).join('<hr style="border:0;border-top:1px solid var(--line);width:100%;margin:0">') + '</div>';
   h += '<div class="row"><button class="btn ghost" data-act="add-asset">' + t('Добавить объект') + '</button></div>' +
-    '<p class="note">' + t('Покупка сама уменьшает деньги на счёте в месяц покупки, отдельная операция не нужна. Амортизация начинается со следующего месяца.') + '</p></section>';
+    '<p class="note">' + t('Покупка сама уменьшает деньги на счёте в месяц покупки: отдельную операцию не вносите. Если техника куплена сразу, можно вместо этого внести операцию «Покупка техники» в «Операциях». Амортизация начинается со следующего месяца.') + '</p></section>';
   return h;
 }
 
@@ -315,10 +394,7 @@ function infoBlock(S) {
     f('Слоган (русский)', 'slogan_ru') + f('Слоган (узбекский)', 'slogan_uz') +
     ta('О клинике (русский)', 'about_ru', 4) + ta('О клинике (узбекский)', 'about_uz', 4) +
     ta('Преимущества, по одному в строке (русский)', 'perks_ru_t', 6) + ta('Преимущества, по одному в строке (узбекский)', 'perks_uz_t', 6) + '</div>';
-  h += '<h2>' + t('Врачи для клиентов') + '</h2>' + I.d.map(function (d, i) {
-    var g = function (label, key, area) { return '<label class="fld"><span>' + t(label) + '</span>' + (area ? '<textarea rows="3" data-idoc="' + i + ':' + key + '">' + esc(d[key] || '') + '</textarea>' : '<input type="text" data-idoc="' + i + ':' + key + '" value="' + esc(d[key] || '') + '">') + '</label>'; };
-    return '<div class="panel"><b>' + esc(d.name) + '</b>' + g('Специальность (русский)', 'specialty_ru') + g('Специальность (узбекский)', 'specialty_uz') + g('О враче (русский)', 'bio_ru', 1) + g('О враче (узбекский)', 'bio_uz', 1) + '</div>';
-  }).join('') + '<div class="row"><button class="btn" data-act="info-save"' + (I.busy ? ' disabled' : '') + '>' + t('Сохранить') + '</button></div></section>';
+  h += '<div class="row gaptop"><button class="btn" data-act="info-save"' + (I.busy ? ' disabled' : '') + '>' + t('Сохранить') + '</button></div></section>';
   return h;
 }
 

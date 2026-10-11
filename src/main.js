@@ -28,12 +28,12 @@ import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js
 
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
-  theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, info: { state: 'idle', s: null, d: [], msg: '', busy: false }, setTab: (function () { try { return localStorage.getItem('uzi-settab') || 'clinic'; } catch (e) { return 'clinic'; } })(), pp: { state: 'idle', s: null, svc: [], removed: [], setup: null, msg: '', busy: false }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
+  theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, opsDay: today(), dayRc: { state: 'idle', rows: [], msg: '' }, staffOpen: false, editStaff: '', rcBusy: false, info: { state: 'idle', s: null, d: [], msg: '', busy: false }, setTab: (function () { try { return localStorage.getItem('uzi-settab') || 'clinic'; } catch (e) { return 'clinic'; } })(), pp: { state: 'idle', s: null, svc: [], removed: [], setup: null, msg: '', busy: false }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
   draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
 };
 var db = false, ready = false, rendering = false;
 try { var rv0 = localStorage.getItem('uzi-rep'); if (['pl', 'cash', 'bal', 'cmp'].indexOf(rv0) >= 0) S.repView = rv0; } catch (e) { /* без запоминания */ }
-try { var t0 = localStorage.getItem('uzi-tab'); if (t0 && TABS.some(function (t) { return t[0] === t0; })) S.tab = t0; } catch (e) { /* без запоминания вкладки */ }
+// при входе всегда открывается «Обзор»
 
 /* ---------- тема: как в системе → светлая → тёмная ---------- */
 var THEMES = ['auto', 'light', 'dark'];
@@ -118,6 +118,46 @@ function loadClinic() {
     return clinic.share(r.from, r.to).then(function (rows) { c.rows = rows; c.state = 'ok'; });
   }).catch(function (e) { c.state = 'error'; c.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
 }
+
+/* ---------- «Назад» на телефоне: сначала на «Обзор», затем выход ---------- */
+history.replaceState({ root: 1 }, '');
+window.addEventListener('popstate', function (e) { var st = e.state || {}, tb = st.tab || 'home'; if (tb !== S.tab) { S.tab = tb; render(); window.scrollTo(0, 0); } });
+function openTab(id) {
+  S.tab = id; render(); window.scrollTo(0, 0);
+  var cur = history.state || {};
+  if (id === 'home') { if (cur.tab) history.back(); } else if (cur.tab) history.replaceState({ tab: id }, ''); else history.pushState({ tab: id }, '');
+  if (id === 'pay') loadClinic(); if (id === 'set' && S.info.state !== 'ok') loadInfo();
+  if (id === 'ops') dayRcLoad(); if (id === 'ops' || id === 'home') { rcSync(S.M); rcSync(ymOf(today())); }
+}
+
+/* ---------- поступления из «Ресепшена» в учёт ---------- */
+function addDays(d, n) { var x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+function dayRcLoad() {
+  var R = S.dayRc; if (!sync.enabled || !S.sync.user) { R.state = 'idle'; render(); return Promise.resolve(); }
+  R.state = 'loading'; render();
+  rcSync(ymOf(S.opsDay));
+  return clinic.dayReceipts(S.opsDay).then(function (rows) { R.rows = rows; R.state = 'ok'; }).catch(function (e) { R.state = 'error'; R.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
+}
+// Приём из «Ресепшена» вносится в операции сам: по одной строке на день и способ оплаты, повторно не дублируется
+function rcSync(ym) {
+  if (!sync.enabled || !S.sync.user || S.rcBusy) return Promise.resolve();
+  S.rcBusy = true; var r = clinic.monthRange(ym);
+  return clinic.role().then(function (role) { return role === 'owner' ? clinic.incomeByDay(r.from, r.to) : null; }).then(function (rows) {
+    if (!rows) return;
+    var want = {};
+    rows.forEach(function (x) { var tot = Math.round(+x.total); if (!(tot > 0)) return; var id = 'rc:' + x.d + ':' + x.method + ':' + x.kind; want[id] = { id: id, d: x.d, t: 'income', c: 'usl', a: tot, acct: x.method, cnt: +x.n, src: 'rc' }; });
+    var doc = S.months[ym] || { ops: [] }, changed = false;
+    var keep = (doc.ops || []).filter(function (o) {
+      if (String(o.id).indexOf('rc:') !== 0) return true;
+      var w = want[o.id]; if (!w) { changed = true; return false; }
+      if (o.a !== w.a || o.cnt !== w.cnt || o.acct !== w.acct) { o.a = w.a; o.cnt = w.cnt; o.acct = w.acct; changed = true; }
+      delete want[o.id]; return true;
+    });
+    Object.keys(want).forEach(function (k) { keep.push(want[k]); changed = true; });
+    if (changed) { doc = mdoc(ym); doc.ops = keep; writeMonth(ym); render(); }
+  }).catch(function () { /* нет связи или не владелец: учёт остаётся как есть */ }).then(function () { S.rcBusy = false; });
+}
+setInterval(function () { if (document.visibilityState === 'visible' && S.sync.user && (S.tab === 'ops' || S.tab === 'home')) { rcSync(ymOf(today())); if (S.tab === 'ops') clinic.dayReceipts(S.opsDay).then(function (rows) { S.dayRc.rows = rows; S.dayRc.state = 'ok'; render(); }).catch(function () {}); } }, 120000);
 
 /* ---------- данные клиники для Навбата и бота ---------- */
 function mapCoords(url) {
@@ -236,7 +276,7 @@ document.addEventListener('click', function (ev) {
   var b = ev.target.closest('[data-act]'); if (!b) return; var act = b.dataset.act, id = b.dataset.id;
   if (act.indexOf('del-') === 0) {
     if (S.armed !== act + id) { S.armed = act + id; render(); return; } S.armed = null;
-    if (act === 'del-op') { var d = mdoc(S.M); d.ops = d.ops.filter(function (o) { return o.id !== id; }); saveMonth(S.M); }
+    if (act === 'del-op') { Object.keys(S.months).forEach(function (mk) { var dm = S.months[mk]; if (dm && dm.ops && dm.ops.some(function (o) { return o.id === id; })) { dm.ops = dm.ops.filter(function (o) { return o.id !== id; }); writeMonth(mk); } }); render(); }
     else if (act === 'del-staff') { S.cfg.staff = S.cfg.staff.filter(function (s) { return s.id !== id; }); saveCfg(); }
     else if (act === 'del-asset') { S.cfg.assets = S.cfg.assets.filter(function (a) { return a.id !== id; }); saveCfg(); }
     return;
@@ -247,9 +287,14 @@ document.addEventListener('click', function (ev) {
   else if (act === 'lang-menu') { var lm = document.getElementById('langmenu'); lm.hidden = !lm.hidden; }
   else if (act === 'theme-flip') { var nx = effDark() ? 'light' : 'dark'; try { localStorage.setItem('uzi-theme', nx); } catch (e) { /* не страшно */ } applyTheme(nx); render(); }
   else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
-  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); }
-  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); }
-  else if (act === 'tab') { S.tab = id; try { localStorage.setItem('uzi-tab', S.tab); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); if (id === 'pay') loadClinic(); if (id === 'set' && S.info.state !== 'ok') loadInfo(); }
+  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); rcSync(S.M); }
+  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); rcSync(S.M); }
+  else if (act === 'tab') openTab(id);
+  else if (act === 'ops-prev') { S.opsDay = addDays(S.opsDay, -1); dayRcLoad(); }
+  else if (act === 'ops-next') { S.opsDay = addDays(S.opsDay, 1); dayRcLoad(); }
+  else if (act === 'ops-today') { S.opsDay = today(); dayRcLoad(); }
+  else if (act === 'staff-toggle') { S.staffOpen = !S.staffOpen; render(); }
+  else if (act === 'staff-edit') { S.editStaff = S.editStaff === id ? '' : id; render(); }
   else if (act === 'type') { S.draft.type = id; S.draft.cat = CATS[id][0][0]; render(); }
   else if (act === 'set-tab') { S.setTab = id; try { localStorage.setItem('uzi-settab', id); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); }
   else if (act === 'info-save') saveInfo();
@@ -259,8 +304,8 @@ document.addEventListener('click', function (ev) {
   else if (act === 'loan-toggle') { S.loanOpen = !S.loanOpen; render(); }
   else if (act === 'accrue') { if (!S.cfg.staff.length) return; if (S.cfg.staff.some(function (s) { return s.pct > 0; }) && S.clinic.state !== 'ok') { toast(T('Данные Ресепшена ещё не загружены: от них считается процент сотрудников')); return; } mdoc(S.M).payroll = payCalc(staffEff(S), S.cfg.tax); saveMonth(S.M); toast(T('Зарплата за {m} начислена', { m: mName(S.M).toLowerCase() })); }
   else if (act === 'unaccrue') { mdoc(S.M).payroll = null; saveMonth(S.M); }
-  else if (act === 'add-staff') { S.cfg.staff.push({ id: uid(), name: '', role: '', salary: 0 }); saveCfg(); }
-  else if (act === 'add-asset') { S.cfg.assets.push({ id: uid(), name: '', cost: 0, date: today(), life: 60, acct: 'bank' }); saveCfg(); }
+  else if (act === 'add-staff') { var nid = uid(); S.cfg.staff.push({ id: nid, name: '', role: 'Медсестра', salary: 0 }); S.staffOpen = true; S.editStaff = nid; saveCfg(); }
+  else if (act === 'add-asset') { S.cfg.assets.push({ id: uid(), name: '', cost: 0, date: today(), life: 60, acct: 'transfer' }); saveCfg(); }
   else if (act === 'sync-login') authAction('in');
   else if (act === 'sync-signup') authAction('up');
   else if (act === 'sync-now') doSync(true);
@@ -336,9 +381,9 @@ registerSW({ immediate: true });
     sync.onAuth(function (u) {
       var was = S.sync.user && S.sync.user.id;
       S.sync.user = u; if (!u) S.info.state = 'idle'; render(); if (u && S.tab === 'set') loadInfo();
-      if (u && (!was || was !== u.id)) { doSync(false); if (S.tab === 'pay') loadClinic(); }
+      if (u && (!was || was !== u.id)) { doSync(false); if (S.tab === 'pay') loadClinic(); rcSync(ymOf(today())); }
     });
-    if (S.sync.user) { doSync(false); if (S.tab === 'pay') loadClinic(); if (S.tab === 'set') loadInfo(); } else render();
+    if (S.sync.user) { doSync(false); if (S.tab === 'pay') loadClinic(); if (S.tab === 'set') loadInfo(); rcSync(ymOf(today())); } else render();
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - (S.sync.at || 0) > SYNC_EVERY) doSync(false); });
     window.addEventListener('online', function () { doSync(false); });
     setInterval(function () { if (document.visibilityState === 'visible' && navigator.onLine) doSync(false); }, SYNC_EVERY);

@@ -29,7 +29,7 @@ export async function loadInfo() {
 }
 export async function saveInfo(s, docs) {
   const a = await sb.from('clinic_settings').update(s).eq('id', 1); if (a.error) throw a.error;
-  for (const d of docs) {
+  for (const d of []) { // данные врачей для клиентов больше не показываются
     const r = await sb.from('doctors').update({ specialty_ru: d.specialty_ru, specialty_uz: d.specialty_uz, bio_ru: d.bio_ru, bio_uz: d.bio_uz }).eq('id', d.id); if (r.error) throw r.error;
   }
 }

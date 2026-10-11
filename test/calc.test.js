@@ -133,7 +133,7 @@ describe('баланс: активы − обязательства − капи
   // Детерминированный генератор, чтобы тест воспроизводился.
   const rng = (seed) => () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
   const INC = ['usl', 'other_inc', 'contrib'];
-  const EXP = ['supplies', 'util', 'ads', 'repair', 'bank', 'other', 'pay_sal', 'pay_ptax', 'pay_rent', 'pay_int', 'pay_princ', 'pay_tax', 'dividend'];
+  const EXP = ['supplies', 'util', 'ads', 'repair', 'bank', 'other', 'pay_sal', 'pay_ptax', 'pay_rent', 'pay_int', 'pay_princ', 'pay_tax', 'dividend', 'equip'];
 
   it('сходится на 300 случайных сценариях по всем месяцам', () => {
     for (let s = 1; s <= 300; s++) {
@@ -150,7 +150,7 @@ describe('баланс: активы − обязательства − капи
         const m = addM('2026-01', k), ops = [];
         for (let j = 0, n = Math.floor(R() * 12); j < n; j++) {
           const t = R() < 0.5 ? 'income' : 'expense';
-          ops.push(op(m + '-10', t, pick(t === 'income' ? INC : EXP), Math.round(R() * 2e7) + 1, pick(['cash', 'bank'])));
+          ops.push(op(m + '-10', t, pick(t === 'income' ? INC : EXP), Math.round(R() * 2e7) + 1, pick(['cash', 'bank', 'card', 'transfer', 'founder'])));
         }
         months[m] = { ops, payroll: R() < 0.6 ? payCalc(staff, cfg.tax) : null };
       }

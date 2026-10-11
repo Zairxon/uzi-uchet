@@ -14,7 +14,7 @@ export async function hardRefresh() {
 export function drawFooter() {
   let el = document.getElementById('appfoot');
   if (!el) { el = document.createElement('footer'); el.id = 'appfoot'; document.body.appendChild(el); el.addEventListener('click', (ev) => { if (ev.target.closest('#fup')) hardRefresh(); }); }
-  el.innerHTML = '<span class="fv">' + name + ' · ' + t('Версия') + ' ' + stamp(BUILD) + '</span><button type="button" id="fup" class="fup' + (newer ? ' new' : '') + '"' + (busy ? ' disabled' : '') + '>' + t(busy ? 'Обновляю…' : newer ? 'Обновить: есть новая версия' : 'Обновить') + '</button>';
+  el.innerHTML = '<span class="fv">' + name + ' · ' + t('Версия') + ' ' + stamp(BUILD) + '</span>' + (newer || busy ? '<button type="button" id="fup" class="fup' + (newer ? ' new' : '') + '"' + (busy ? ' disabled' : '') + '>' + t(busy ? 'Обновляю…' : newer ? 'Обновить: есть новая версия' : 'Обновить') + '</button>' : '');
 }
 async function check() {
   try {

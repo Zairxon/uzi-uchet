@@ -36,29 +36,32 @@ export function compute(cfg, months, upto) {
   starts = starts.filter(Boolean).sort();
   var first = starts[0] || upto, rows = [], intBy = {}; sched(cfg.loan).forEach(function (r) { intBy[r.m] = r.int; });
   var B = { cash: 0, bank: 0, fa: 0, dep: 0, loan: 0, contrib: 0, div: 0, profit: 0, pay: { wage: 0, rent: 0, int: 0, tax: 0 } };
+  var eq = []; Object.keys(months).forEach(function (mm) { ((months[mm] && months[mm].ops) || []).forEach(function (o) { if (o.t === 'expense' && o.c === 'equip') eq.push({ m: ymOf(o.d) || mm, cost: o.a || 0, life: 60 }); }); });
   var loanM = cfg.loan.amount ? ymOf(cfg.loan.start) : '', rentM = ymOf(cfg.rent.start), guard = 0;
   for (var m = first; m <= upto && guard < 720; m = addM(m, 1), guard++) {
     var r = blank(m); r.open = B.cash + B.bank;
     ((months[m] && months[m].ops) || []).forEach(function (o) {
-      var a = o.a || 0, A = o.acct === 'bank' ? 'bank' : 'cash';
-      if (o.t === 'income') { B[A] += a; if (o.c === 'contrib') { B.contrib += a; r.cf.contrib += a; } else { r.rev += a; r.cf.cust += a; } }
+      var a = o.a || 0, A = o.acct === 'cash' ? 'cash' : o.acct === 'founder' ? '' : 'bank'; // карта, перечисление и старый «банк» — на счёте; «учредитель» — свои деньги учредителя
+      if (o.t === 'income') { if (A) B[A] += a; else { B.div += a; r.cf.div += a; } if (o.c === 'contrib') { B.contrib += a; r.cf.contrib += a; } else { r.rev += a; r.cf.cust += a; } }
       else {
-        B[A] -= a;
+        if (A) B[A] -= a; else { B.contrib += a; r.cf.contrib += a; } // оплатил учредитель: вклад учредителя
         if (o.c === 'pay_sal' || o.c === 'pay_ptax') { B.pay.wage -= a; r.cf.wage += a; }
         else if (o.c === 'pay_rent') { B.pay.rent -= a; r.cf.rent += a; }
         else if (o.c === 'pay_int') { B.pay.int -= a; r.cf.int += a; }
         else if (o.c === 'pay_tax') { B.pay.tax -= a; r.cf.tax += a; }
         else if (o.c === 'pay_princ') { B.loan -= a; r.cf.princ += a; }
         else if (o.c === 'dividend') { B.div += a; r.cf.div += a; }
+        else if (o.c === 'equip') { B.fa += a; r.cf.capex += a; } // покупка техники: не расход, а имущество (амортизация идёт по частям)
         else { r.opex[o.c] = (r.opex[o.c] || 0) + a; r.opexSum += a; r.cf.opex += a; }
       }
     });
     if (loanM === m) { B.bank += cfg.loan.amount; B.loan += cfg.loan.amount; r.cf.loanIn += cfg.loan.amount; }
     cfg.assets.forEach(function (a) {
       var am = ymOf(a.date); if (!am || !a.cost) return;
-      if (am === m) { B[a.acct === 'cash' ? 'cash' : 'bank'] -= a.cost; B.fa += a.cost; r.cf.capex += a.cost; }
+      if (am === m) { if (a.acct === 'founder') { B.contrib += a.cost; r.cf.contrib += a.cost; } else B[a.acct === 'cash' ? 'cash' : 'bank'] -= a.cost; B.fa += a.cost; r.cf.capex += a.cost; }
       var k = idx(m) - idx(am), life = Math.max(1, a.life || 1); if (k >= 1 && k <= life) r.dep += a.cost / life;
     });
+    eq.forEach(function (q) { var k = idx(m) - idx(q.m); if (k >= 1 && k <= q.life) r.dep += q.cost / q.life; });
     var p = months[m] && months[m].payroll; if (p) { r.payroll = (p.gross || 0) + (p.soc || 0); B.pay.wage += r.payroll; }
     if (rentM && m >= rentM && cfg.rent.amount) { r.rent = cfg.rent.amount; B.pay.rent += r.rent; }
     if (intBy[m]) { r.int = intBy[m]; B.pay.int += r.int; }
