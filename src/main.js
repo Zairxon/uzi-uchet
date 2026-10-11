@@ -27,7 +27,7 @@ import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js
 
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
-  theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, info: { state: 'idle', s: null, d: [], msg: '', busy: false }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
+  theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, info: { state: 'idle', s: null, d: [], msg: '', busy: false }, pp: { state: 'idle', s: null, svc: [], removed: [], setup: null, msg: '', busy: false }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
   draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
 };
 var db = false, ready = false, rendering = false;
@@ -137,10 +137,28 @@ function loadInfo() {
       var s = r.s; s.ph = (s.phones || []).slice(0, 3);
       s.lat = s.lat == null ? '' : String(s.lat).replace('.', ','); s.lng = s.lng == null ? '' : String(s.lng).replace('.', ',');
       s.perks_ru_t = (s.perks_ru || []).join('\n'); s.perks_uz_t = (s.perks_uz || []).join('\n');
-      I.s = s; I.d = r.d; I.state = 'ok';
+      I.s = s; I.d = r.d; I.state = 'ok'; loadPrepay();
     });
   }).catch(function (e) { I.state = 'error'; I.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
 }
+function loadPrepay() {
+  var P = S.pp; P.state = 'loading'; render();
+  return clinic.loadPrepay().then(function (r) {
+    P.s = r.s; P.svc = r.svc.map(function (x) { return { id: x.id, name_ru: x.name_ru, name_uz: x.name_uz || '', price: +x.price, percent: +x.percent, fixed: x.fixed == null ? '' : +x.fixed, active: x.active, sort: x.sort }; }); P.removed = []; P.setup = r.setup; P.state = 'ok';
+  }).catch(function (e) { P.state = 'error'; P.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
+}
+function savePrepay() {
+  var P = S.pp, s = P.s, digits = String(s.card_number || '').replace(/\D/g, ''), hold = parseInt(s.hold_minutes, 10);
+  if (digits && digits.length !== 16) { toast(T('Номер карты: 16 цифр')); return; }
+  if (!(hold >= 5 && hold <= 240)) { toast(T('Время удержания от 5 до 240 минут')); return; }
+  for (var i = 0; i < P.svc.length; i++) { var x = P.svc[i]; if (!(x.name_ru || '').trim()) { toast(T('У каждой услуги нужно название')); return; } if (!(x.percent >= 0 && x.percent <= 100)) { toast(T('Процент от 0 до 100')); return; } }
+  P.busy = true; render();
+  clinic.savePrepay({ card_number: digits ? digits.replace(/(\d{4})(?=\d)/g, '$1 ') : null, card_holder: (s.card_holder || '').trim() || null, receipt_contact: (s.receipt_contact || '').trim() || null, hold_minutes: hold },
+    P.svc.map(function (x, k) { return { id: x.id, name_ru: x.name_ru.trim(), name_uz: (x.name_uz || '').trim() || null, price: +x.price || 0, percent: +x.percent || 0, fixed: x.fixed === '' || x.fixed == null ? null : +x.fixed, active: true, sort: k + 1 }; }), P.removed)
+    .then(function () { P.busy = false; toast(T('Сохранено: сайт и бот покажут новые данные')); return loadPrepay(); })
+    .catch(function (e) { P.busy = false; render(); fail(e); });
+}
+
 function saveInfo() {
   var I = S.info, s = I.s, nz = function (x) { x = (x || '').trim(); return x ? x : null; }, lines = function (x) { return (x || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean); };
   var ll = function (x) { var n = parseFloat(String(x || '').replace(',', '.')); return isFinite(n) ? n : null; };
@@ -233,6 +251,9 @@ document.addEventListener('click', function (ev) {
   else if (act === 'tab') { S.tab = id; try { localStorage.setItem('uzi-tab', S.tab); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); if (id === 'pay') loadClinic(); if (id === 'set' && S.info.state !== 'ok') loadInfo(); }
   else if (act === 'type') { S.draft.type = id; S.draft.cat = CATS[id][0][0]; render(); }
   else if (act === 'info-save') saveInfo();
+  else if (act === 'pp-save') savePrepay();
+  else if (act === 'pp-add') { S.pp.svc.push({ id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : uid() + uid() + uid(), name_ru: '', name_uz: '', price: 0, percent: 30, fixed: '', active: true, sort: S.pp.svc.length + 1 }); render(); }
+  else if (act === 'pp-del') { var dx = S.pp.svc.splice(+id, 1)[0]; if (dx) S.pp.removed.push(dx.id); render(); }
   else if (act === 'loan-toggle') { S.loanOpen = !S.loanOpen; render(); }
   else if (act === 'accrue') { if (!S.cfg.staff.length) return; if (S.cfg.staff.some(function (s) { return s.pct > 0; }) && S.clinic.state !== 'ok') { toast(T('Данные Ресепшена ещё не загружены: от них считается процент сотрудников')); return; } mdoc(S.M).payroll = payCalc(staffEff(S), S.cfg.tax); saveMonth(S.M); toast(T('Зарплата за {m} начислена', { m: mName(S.M).toLowerCase() })); }
   else if (act === 'unaccrue') { mdoc(S.M).payroll = null; saveMonth(S.M); }
@@ -251,6 +272,11 @@ document.addEventListener('input', function (ev) {
   if (el.dataset.kind === 'date') el.value = maskDate(el.value);
   if (el.dataset.d) S.draft[el.dataset.d] = el.dataset.kind === 'date' ? parseDate(el.value) : el.value;
   if (el.dataset.info && S.info.s) S.info.s[el.dataset.info] = el.value;
+  if (el.dataset.pp && S.pp.s) { if (el.dataset.pp === 'card_number') { var cd = el.value.replace(/\D/g, '').slice(0, 16); el.value = cd.replace(/(\d{4})(?=\d)/g, '$1 '); } S.pp.s[el.dataset.pp] = el.value; }
+  if (el.dataset.psvc && S.pp.svc.length) {
+    var pq = el.dataset.psvc.split(':'), row = S.pp.svc[+pq[0]], pk = el.dataset.pk;
+    if (row) { if (pk === 'money') { var md = el.value.replace(/\D/g, ''); el.value = md ? Number(md).toLocaleString('ru-RU') : ''; row[pq[1]] = md ? +md : (pq[1] === 'fixed' ? '' : 0); } else if (pk === 'num') row[pq[1]] = num(el.value); else row[pq[1]] = el.value; }
+  }
   if (el.dataset.iph !== undefined && S.info.s) { var pd = ev.inputType && ev.inputType.indexOf('delete') === 0; el.value = fmtPhoneInput(el.value, pd); S.info.s.ph[+el.dataset.iph] = el.value; }
   if (el.dataset.idoc && S.info.d.length) { var pr = el.dataset.idoc.split(':'); S.info.d[+pr[0]][pr[1]] = el.value; }
   if (el.id === 'sync-email') S.sync.email = el.value;

@@ -33,3 +33,16 @@ export async function saveInfo(s, docs) {
     const r = await sb.from('doctors').update({ specialty_ru: d.specialty_ru, specialty_uz: d.specialty_uz, bio_ru: d.bio_ru, bio_uz: d.bio_uz }).eq('id', d.id); if (r.error) throw r.error;
   }
 }
+
+// Предоплата за онлайн-бронь: карта, время удержания, услуги очереди и код для сотрудников в Telegram
+export async function loadPrepay() {
+  const a = await sb.from('clinic_settings').select('card_number,card_holder,receipt_contact,hold_minutes').eq('id', 1).single(); if (a.error) throw a.error;
+  const b = await sb.from('booking_services').select('id,name_ru,name_uz,price,percent,fixed,active,sort').order('sort').order('name_ru'); if (b.error) throw b.error;
+  const c = await sb.rpc('receipt_setup'); // только владелец
+  return { s: a.data, svc: b.data, setup: c.error ? null : c.data };
+}
+export async function savePrepay(s, svcs, removed) {
+  const a = await sb.from('clinic_settings').update(s).eq('id', 1); if (a.error) throw a.error;
+  for (const id of removed) { const d = await sb.from('booking_services').delete().eq('id', id); if (d.error) throw d.error; }
+  if (svcs.length) { const u = await sb.from('booking_services').upsert(svcs, { onConflict: 'id' }); if (u.error) throw u.error; }
+}

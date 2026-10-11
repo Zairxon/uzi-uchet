@@ -322,6 +322,25 @@ function infoBlock(S) {
   return h;
 }
 
+// Предоплата за бронь: карта, время удержания, услуги очереди с суммой или процентом
+function prepayBlock(S) {
+  var P = S.pp, h = '<section><h2>' + t('Предоплата за бронь') + '</h2>';
+  if (!S.sync.enabled || !S.sync.user || P.state === 'idle' || P.state === 'loading') return h + '<p class="empty">' + (S.sync.user ? t('Загрузка…') : t('Войдите в «Настройки» (синхронизация), чтобы менять данные клиники.')) + '</p></section>';
+  if (P.state === 'error') return h + '<p class="alert">' + t('Не удалось получить данные клиники: {m}', { m: esc(P.msg) }) + '</p></section>';
+  var s = P.s, f = function (label, key, ph, mode, extra) { return '<label class="fld"><span>' + t(label) + '</span><input type="text" data-pp="' + key + '"' + (mode ? ' inputmode="' + mode + '"' : '') + (extra || '') + ' value="' + esc(s[key] == null ? '' : s[key]) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + '></label>'; };
+  h += '<div class="panel">' + f('Номер карты', 'card_number', '8600 0000 0000 0000', 'numeric', ' maxlength="19"') + f('Владелец карты', 'card_holder') + f('Telegram для чека (кому отправить)', 'receipt_contact', '@username') + f('Время удержания брони, минут', 'hold_minutes', '30', 'numeric') + '</div>' +
+    '<p class="note">' + t('Предоплата включается, когда указана карта и есть хотя бы одна услуга ниже. Клиент видит карту, сумму и время на оплату, затем отправляет фото чека.') + '</p>';
+  h += '<h2>' + t('Услуги для очереди') + '</h2>' + (P.svc.length ? P.svc.map(function (x, i) {
+    var dep = x.fixed !== '' && x.fixed != null ? +x.fixed : Math.round((+x.price || 0) * (+x.percent || 0) / 100);
+    var g = function (label, key, kind) { return '<label class="fld"><span>' + t(label) + '</span><input type="text" data-psvc="' + i + ':' + key + '" data-pk="' + kind + '"' + (kind === 'text' ? '' : ' inputmode="decimal" class="n"') + ' value="' + esc(kind === 'money' ? (x[key] === '' || x[key] == null ? '' : fmt(x[key])) : (x[key] == null ? '' : String(x[key]).replace('.', ','))) + '"></label>'; };
+    return '<div class="panel"><div class="grid">' + g('Название (русский)', 'name_ru', 'text') + g('Название (узбекский)', 'name_uz', 'text') + g('Полная сумма, сум', 'price', 'money') + g('Предоплата, % от суммы', 'percent', 'num') + g('Или фиксированная предоплата, сум', 'fixed', 'money') + '</div>' +
+      '<div class="row"><span class="chip ok">' + t('Клиент внесёт вперёд') + ': ' + fmt(dep) + ' ' + t('сум') + '</span><button class="btn ghost danger small" data-act="pp-del" data-id="' + i + '">' + t('Удалить услугу') + '</button></div></div>';
+  }).join('') : '<p class="empty">' + t('Пока нет услуг: предоплата выключена.') + '</p>') +
+    '<div class="row gaptop"><button class="btn ghost" data-act="pp-add">' + t('Добавить услугу очереди') + '</button></div>';
+  if (P.setup) h += '<div class="panel"><b>' + t('Чеки в Telegram для сотрудников') + '</b><p class="small">' + t('Чтобы чеки приходили в Telegram, сотрудник отправляет боту команду: {c}', { c: '<code>/staff ' + esc(P.setup.code) + '</code>' }) + '</p><p class="small muted">' + t('Подключено чатов: {n}', { n: P.setup.chats }) + '</p></div>';
+  return h + '<div class="row"><button class="btn" data-act="pp-save"' + (P.busy ? ' disabled' : '') + '>' + t('Сохранить') + '</button></div></section>';
+}
+
 export function vSet(S) {
   var tx = S.cfg.tax;
   return '<section><h2>' + t('Налоговый режим') + '</h2><div class="panel"><label class="fld"><span>' + t('Как фирма платит налог') + '</span>' +
@@ -329,7 +348,7 @@ export function vSet(S) {
     '<div class="grid">' + inp(S, t('Налог с оборота, %'), 'tax.turnover', 'num') + inp(S, t('Налог на прибыль, %'), 'tax.profit', 'num') + '</div></div></section>' +
     '<section><h2>' + t('Ставки с зарплаты') + '</h2><div class="panel"><div class="grid">' + inp(S, t('НДФЛ, %'), 'tax.ndfl', 'num') + inp(S, t('ИНПС, %'), 'tax.inps', 'num') + inp(S, t('Социальный налог, %'), 'tax.soc', 'num') + '</div></div>' +
     '<p class="note">' + t('Ставки по умолчанию взяты на 2026 год и сверены 10.10.2026. Налог на прибыль считается упрощённо, от прибыли каждого месяца. Перед сдачей отчётности сверяйте суммы с бухгалтером и my.soliq.uz: программа ведёт внутренний учёт и официальную отчётность не заменяет.') + '</p></section>' +
-    infoBlock(S) + syncBlock(S) + appsBlock() +
+    infoBlock(S) + prepayBlock(S) + syncBlock(S) + appsBlock() +
     '<section><h2>' + t('Резервная копия') + '</h2><div class="panel">' +
     '<div class="row"><button class="btn" data-act="backup-save">' + t('Скачать резервную копию') + '</button><button class="btn ghost" data-act="backup-load">' + t('Загрузить из копии') + '</button></div>' +
     '<input id="backup-file" type="file" accept="application/json,.json" hidden></div>' +
