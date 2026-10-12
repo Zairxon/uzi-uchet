@@ -64,7 +64,9 @@ export function vHome(S, C) {
     '<div class="kpi"><span>' + t('Расходы и налог') + '</span><b>' + fmt(exp) + '</b></div>' +
     '<div class="kpi"><span>' + t('Чистая прибыль') + '</span><b class="' + (r.net < 0 ? 'neg' : 'pos') + '">' + fmt(r.net) + '</b></div>' +
     '<div class="kpi"><span>' + t('Деньги на конец месяца') + '</span><b>' + fmt(B.cash + B.bank) + '</b></div></div>' +
-    '<p class="small muted">' + t('Суммы в сумах за {m}. Касса: {c}, банк: {b}.', { m: lc(M), c: '<span class="num">' + fmt(B.cash) + '</span>', b: '<span class="num">' + fmt(B.bank) + '</span>' }) + '</p></section>';
+    '<p class="small muted">' + t('Суммы в сумах за {m}. Касса: {c}, банк: {b}.', { m: lc(M), c: '<span class="num">' + fmt(B.cash) + '</span>', b: '<span class="num">' + fmt(B.bank) + '</span>' }) + '</p>' +
+    '<h3 class="subh">' + t('Из чего складываются расходы за месяц') + '</h3><ul class="list">' + [['Расходы по внесённым операциям', r.opexSum], ['Зарплата с социальным налогом', r.payroll], ['Аренда', r.rent], ['Проценты по кредиту', r.int], ['Амортизация', r.dep], ['Налог с оборота или прибыли', r.tax]].filter(function (x) { return x[1] > 0; }).map(function (x) { return '<li><div class="li-main"><b>' + t(x[0]) + '</b></div><span class="num">' + fmt(x[1]) + '</span></li>'; }).join('') + '</ul>' +
+    (r.net < 0 ? '<p class="note">' + t('Прибыль отрицательная: выручка месяца меньше расходов. Аренда, зарплата, проценты и амортизация начисляются за месяц целиком, даже если по операциям расходов нет.') + '</p>' : '') + '</section>';
   var due = [['Кредит, остаток основного долга', B.loan], ['Зарплата и налоги с неё', B.pay.wage], ['Аренда', B.pay.rent], ['Проценты по кредиту', B.pay.int], ['Налог с оборота или прибыли', B.pay.tax]];
   h += '<section><h2>' + t('Долги на конец месяца') + '</h2><ul class="list">' + due.map(function (d) { return '<li><div class="li-main"><b>' + t(d[0]) + '</b></div><span class="num">' + fmt(d[1]) + '</span></li>'; }).join('') + '</ul>' +
     '<p class="note">' + t('Начислено, но ещё не оплачено. Отрицательная сумма означает переплату.') + '</p></section>';
