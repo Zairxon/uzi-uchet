@@ -451,3 +451,7 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .rct.grid th,.rct.grid td{border-width:0 1px 1px 0!important}
 .rct.grid th:last-child,.rct.grid td:last-child{border-right:0!important}
 .rct.grid tfoot td{border-bottom:0!important}
+
+.seg.four{flex-wrap:wrap}.seg.four button{flex:1 1 28%}
+.srct th,.srct td{padding:5px 4px!important;font-size:11px!important}.srct th{white-space:nowrap}.srct td.lbl,.srct td:first-child{font-size:12px!important;min-width:110px}
+.fld .seg.four button{flex:1 1 30%}

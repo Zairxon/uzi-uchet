@@ -9,3 +9,6 @@ export const APP_LINKS = {
   reception: 'https://mitti-resepshen.vercel.app/',
   queue: 'https://mitti-navbat.vercel.app/',
 };
+
+// Telegram-бот клиники: ссылка с меткой источника вида ?start=u_источник-формат-кампания
+export const BOT_URL = 'https://t.me/mittiyurakcha_bot';

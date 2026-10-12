@@ -23,7 +23,7 @@ import { t as T, getLang, setLang, brand } from './i18n.js';
 import { mountFooter } from './footer.js';
 import { parseDate, maskDate, openCal, closeCal } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
-import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff } from './views.js';
+import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff, srcLinksHtml } from './views.js';
 import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js';
 window.__appReady = true;
 
@@ -33,7 +33,7 @@ var S = {
   draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
 };
 var db = false, ready = false, rendering = false;
-try { var rv0 = localStorage.getItem('uzi-rep'); if (['pl', 'cash', 'bal', 'loan', 'cmp'].indexOf(rv0) >= 0) S.repView = rv0; } catch (e) { /* без запоминания */ }
+try { var rv0 = localStorage.getItem('uzi-rep'); if (['pl', 'cash', 'bal', 'loan', 'src', 'cmp'].indexOf(rv0) >= 0) S.repView = rv0; } catch (e) { /* без запоминания */ }
 // при входе всегда открывается «Обзор»
 
 /* ---------- тема: как в системе → светлая → тёмная ---------- */
@@ -129,6 +129,14 @@ function openTab(id) {
   if (id === 'home') { if (cur.tab) history.back(); } else if (cur.tab) history.replaceState({ tab: id }, ''); else history.pushState({ tab: id }, '');
   if (id === 'pay') loadClinic(); if (id === 'set' && S.info.state !== 'ok') loadInfo();
   if (id === 'ops') dayRcLoad(); if (id === 'ops' || id === 'home') { rcSync(S.M); rcSync(ymOf(today())); }
+}
+
+/* ---------- источники клиентов ---------- */
+function srcState() { if (!S.src) S.src = { state: 'idle', rows: [], msg: '', u: { source: 'instagram', custom: '', medium: 'bio', campaign: '' } }; return S.src; }
+function loadSrc() {
+  var X = srcState(); if (!sync.enabled || !S.sync.user) { X.state = 'idle'; render(); return Promise.resolve(); }
+  X.state = 'loading'; render(); var r = clinic.monthRange(S.M);
+  return clinic.sourceStats(r.from, r.to).then(function (rows) { X.rows = rows; X.state = 'ok'; }).catch(function (e) { X.state = 'error'; X.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
 }
 
 /* ---------- поступления из «Ресепшена» в учёт ---------- */
@@ -283,13 +291,16 @@ document.addEventListener('click', function (ev) {
     return;
   }
   S.armed = null;
-  if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); }
+  if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); if (id === 'src') loadSrc(); }
+  else if (act === 'src-pick') { srcState().u.source = id; render(); }
+  else if (act === 'src-medium') { srcState().u.medium = id; render(); }
+  else if (act === 'src-copy') { var inp = document.getElementById(id); if (inp) { inp.select(); try { navigator.clipboard.writeText(inp.value); } catch (e) { document.execCommand('copy'); } b.textContent = T('Скопировано'); } }
   else if (act === 'lang-set') { setLang(id); document.getElementById('langmenu').hidden = true; render(); }
   else if (act === 'lang-menu') { var lm = document.getElementById('langmenu'); lm.hidden = !lm.hidden; }
   else if (act === 'theme-flip') { var nx = effDark() ? 'light' : 'dark'; try { localStorage.setItem('uzi-theme', nx); } catch (e) { /* не страшно */ } applyTheme(nx); render(); }
   else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
-  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); rcSync(S.M); }
-  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); rcSync(S.M); }
+  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); rcSync(S.M); }
+  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); rcSync(S.M); }
   else if (act === 'tab') openTab(id);
   else if (act === 'ops-prev') { S.opsDay = addDays(S.opsDay, -1); dayRcLoad(); }
   else if (act === 'ops-next') { S.opsDay = addDays(S.opsDay, 1); dayRcLoad(); }
@@ -327,6 +338,7 @@ document.addEventListener('input', function (ev) {
   }
   if (el.dataset.iph !== undefined && S.info.s) { var pd = ev.inputType && ev.inputType.indexOf('delete') === 0; el.value = fmtPhoneInput(el.value, pd); S.info.s.ph[+el.dataset.iph] = el.value; }
   if (el.dataset.idoc && S.info.d.length) { var pr = el.dataset.idoc.split(':'); S.info.d[+pr[0]][pr[1]] = el.value; }
+  if (el.dataset.src) { var X2 = srcState(); X2.u[el.dataset.src] = el.value; var lk = document.getElementById('src-links'); if (lk) lk.innerHTML = srcLinksHtml(X2.u); }
   if (el.id === 'sync-email') S.sync.email = el.value;
   if (el.id === 'sync-pass') S.sync.pass = el.value;
 });

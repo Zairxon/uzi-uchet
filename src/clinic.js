@@ -50,3 +50,6 @@ export async function savePrepay(s, svcs, removed) {
 // Поступления из «Ресепшена»: по дням и способам оплаты (для учёта) и список пациентов дня (для отчёта)
 export async function incomeByDay(from, to) { const r = await sb.rpc('income_by_day', { p_from: from, p_to: to }); if (r.error) throw r.error; return r.data || []; }
 export async function dayReceipts(day) { const r = await sb.rpc('day_receipts', { p_date: day }); if (r.error) throw r.error; return r.data || []; }
+
+// Откуда пришли клиенты за период (по меткам рекламных ссылок, звонкам и живой очереди)
+export async function sourceStats(from, to) { const r = await sb.rpc('source_stats', { p_from: from, p_to: to }); if (r.error) throw r.error; return r.data || []; }

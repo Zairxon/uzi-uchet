@@ -4,8 +4,9 @@ import { sched, payCalc, blank, ytd, compareTax } from './calc.js';
 import { addM, mName, ymOf, fmt, fmtM, esc, today } from './util.js';
 import { t, months, getLang } from './i18n.js';
 import { fmtDate } from './datepicker.js';
-import { APP_LINKS } from './config.js';
+import { APP_LINKS, BOT_URL } from './config.js';
 import { fmtPhone } from './phone.js';
+import { cyr2lat } from './translit.js';
 
 export const TABS = [['home', 'Обзор'], ['ops', 'Операции'], ['pay', 'Зарплата'], ['loan', 'Кредит и аренда'], ['rep', 'Отчёты'], ['set', 'Настройки']];
 export const CATS = {
@@ -284,6 +285,48 @@ export function vLoan(S) {
   return h;
 }
 
+// Источники клиентов: таблица за месяц и создание рекламных ссылок с меткой
+var SRC_SOURCES = [['instagram', 'Инстаграм'], ['telegram', 'Телеграм'], ['facebook', 'Фейсбук'], ['google', 'Гугл'], ['yandex', 'Яндекс'], ['2gis', '2ГИС'], ['flyer', 'Листовка'], ['barcode', 'Штрих-код'], ['other', 'Другое']];
+var SRC_MEDIA = [['bio', 'Профиль'], ['post', 'Публикация'], ['stories', 'Истории'], ['ads', 'Реклама'], ['barcode', 'Штрих-код'], ['sms', 'СМС']];
+export function srcSlug(s) { return cyr2lat(String(s || '')).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40); }
+export function srcLinks(u) {
+  var src = u.source === 'other' ? srcSlug(u.custom) : u.source, med = u.medium || '', cmp = srcSlug(u.campaign);
+  if (!src) return null;
+  var q = 'utm_source=' + encodeURIComponent(src) + (med ? '&utm_medium=' + encodeURIComponent(med) : '') + (cmp ? '&utm_campaign=' + encodeURIComponent(cmp) : '');
+  return { web: APP_LINKS.queue + '?' + q, bot: BOT_URL + '?start=u_' + [src, med, cmp].join('-').replace(/-+$/, '') };
+}
+function srcLinksHtml(u) {
+  var l = srcLinks(u); if (!l) return '<p class="small muted">' + t('Введите название источника.') + '</p>';
+  var row = function (label, url, id) { return '<div class="fld"><span>' + t(label) + '</span><div class="row"><input type="text" readonly value="' + esc(url) + '" id="' + id + '" style="font-size:12px"><button type="button" class="btn ghost" data-act="src-copy" data-id="' + id + '">' + t('Копировать') + '</button></div></div>'; };
+  return row('Ссылка на «Навбат»', l.web, 'src-web') + row('Ссылка на бота', l.bot, 'src-bot');
+}
+export { srcLinksHtml };
+function srcView(S) {
+  var X = S.src || { state: 'idle', rows: [], msg: '', u: { source: 'instagram', custom: '', medium: 'bio', campaign: '' } }, u = X.u;
+  var h = '<section><h2>' + t('Откуда клиенты за {m}', { m: lc(S.M) }) + '</h2>';
+  if (!S.sync.enabled || !S.sync.user) h += '<p class="empty">' + t('Войдите в «Настройки» (синхронизация), чтобы видеть данные Ресепшена.') + '</p>';
+  else if (X.state === 'loading' || X.state === 'idle') h += '<p class="empty">' + t('Загрузка…') + '</p>';
+  else if (X.state === 'error') h += '<p class="alert">' + esc(X.msg) + '</p>';
+  else if (!X.rows.length) h += '<p class="empty">' + t('Нет записей за этот месяц.') + '</p>';
+  else {
+    var CH = { call: 'По звонку', walkin: 'Живая очередь', site: 'Сайт без метки', bot: 'Бот без метки' }, T = { total: 0, visited: 0, noshow: 0, revenue: 0 }, maxV = 1;
+    X.rows.forEach(function (x) { T.total += +x.total; T.visited += +x.visited; T.noshow += +x.noshow; T.revenue += +x.revenue; if (+x.visited > maxV) maxV = +x.visited; });
+    var lbl = function (x) { if (CH[x.src]) return t(CH[x.src]); var k = SRC_SOURCES.filter(function (s) { return s[0] === x.src; })[0]; return esc(k ? t(k[1]) : x.src) + (x.campaign ? ' <span class="small muted">· ' + esc(x.campaign) + '</span>' : '') + ' <span class="chip">' + t(x.channel === 'bot' ? 'Бот' : 'Сайт') + '</span>'; };
+    var top = X.rows.filter(function (x) { return +x.visited > 0; })[0];
+    if (top) h += '<p class="small"><b>' + t('Больше всего клиентов пришло из: {s}', { s: lbl(top) }) + '</b></p>';
+    h += '<div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Источник') + '</th><th class="r">' + t('Записей') + '</th><th class="r">' + t('Пришли') + '</th><th class="r">' + t('Не пришли') + '</th><th class="r">' + t('Выручка') + '</th></tr></thead><tbody>' + X.rows.map(function (x) {
+      return '<tr><td>' + lbl(x) + '<div class="bar" style="width:' + Math.round(+x.visited / maxV * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + x.total + '</td><td class="r num"><b>' + x.visited + '</b></td><td class="r num">' + x.noshow + '</td><td class="r num">' + fmt(+x.revenue) + '</td></tr>';
+    }).join('') + '</tbody><tfoot><tr><td><b>' + t('Итого') + '</b></td><td class="r num"><b>' + T.total + '</b></td><td class="r num"><b>' + T.visited + '</b></td><td class="r num"><b>' + T.noshow + '</b></td><td class="r num"><b>' + fmt(T.revenue) + '</b></td></tr></tfoot></table></div>';
+  }
+  h += '</section><section><h2>' + t('Ссылки для рекламы') + '</h2><div class="panel"><p class="small muted">' + t('Выберите, где будет стоять ссылка. Приложение создаст адрес с меткой, и клиенты с него будут видны в таблице выше. Записи по звонку и из живой очереди отмечает ресепшен.') + '</p>' +
+    '<div class="fld"><span>' + t('Где размещаем') + '</span><div class="seg four">' + SRC_SOURCES.map(function (s) { return '<button type="button" data-act="src-pick" data-id="' + s[0] + '" aria-pressed="' + (u.source === s[0]) + '">' + t(s[1]) + '</button>'; }).join('') + '</div></div>' +
+    (u.source === 'other' ? '<div class="fld"><span>' + t('Своё название') + '</span><input type="text" data-src="custom" value="' + esc(u.custom) + '" autocomplete="off"></div>' : '') +
+    '<div class="fld"><span>' + t('Формат') + '</span><div class="seg four">' + SRC_MEDIA.map(function (s) { return '<button type="button" data-act="src-medium" data-id="' + s[0] + '" aria-pressed="' + (u.medium === s[0]) + '">' + t(s[1]) + '</button>'; }).join('') + '</div></div>' +
+    '<div class="fld"><span>' + t('Название кампании (необязательно)') + '</span><input type="text" data-src="campaign" value="' + esc(u.campaign) + '" autocomplete="off" placeholder="' + esc(t('например: октябрь')) + '"></div>' +
+    '<div id="src-links">' + srcLinksHtml(u) + '</div>' +
+    '<p class="note">' + t('Штрих-код для входа по ссылке добавим позже: он будет вести на этот же адрес с меткой.') + '</p></div></section>';
+  return h;
+}
 function loanRep(S, C) {
   var cfg = S.cfg, M = S.M, l = cfg.loan, B = C.B, started = !!(l.amount && ymOf(l.start) && ymOf(l.start) <= M), SC = sched(l, ymOf(l.start) || M), h = '';
   var acc = 0, nextPay = null; SC.forEach(function (x) { if (x.m <= M) acc += x.int; if (x.m === addM(M, 1)) nextPay = x; });
@@ -350,9 +393,9 @@ export function vRep(S, C) {
     tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div></section>';
   var balN = '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p>';
   // один отчёт на экране: таблицы на всю ширину, переключатель сверху
-  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), cmp: cmpH + cmpRest };
+  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), src: srcView(S), cmp: cmpH + cmpRest };
   var rv = blocks[S.repView] ? S.repView : 'pl';
-  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['cmp', 'Налоги']].map(function (x) {
+  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['src', 'Источники'], ['cmp', 'Налоги']].map(function (x) {
     return '<button type="button" role="tab" data-act="rep-view" data-id="' + x[0] + '" aria-pressed="' + (rv === x[0]) + '">' + t(x[1]) + '</button>';
   }).join('') + '</div>';
   return nav + blocks[rv];
