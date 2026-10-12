@@ -97,10 +97,10 @@ function rcBlock(S, day) {
   if (!R.rows.length) return h + '<p class="small muted">' + t('В этот день оплат из «Ресепшена» не было.') + '</p></div>';
   var sum = 0, vis = 0;
   R.rows.forEach(function (x) { var a = x.kind === 'refund' ? -x.amount : +x.amount; sum += a; if (x.kind === 'visit') vis++; });
-  h += '<div class="scroll"><table class="rct"><thead><tr><th>' + t('Время') + '</th><th>' + t('Пациент') + ' / ' + t('Врач') + '</th><th class="r">' + t('Оплата') + ' / ' + t('Сумма') + '</th></tr></thead><tbody>' + R.rows.map(function (x) {
+  h += '<div class="scroll"><table class="rct grid"><thead><tr><th>' + t('Время') + '</th><th>' + t('Пациент') + '</th><th>' + t('Врач / услуга') + '</th><th class="r">' + t('Оплата') + ' / ' + t('Сумма') + '</th></tr></thead><tbody>' + R.rows.map(function (x) {
     var ref = x.kind === 'refund', a = ref ? -x.amount : +x.amount, how = ref ? '↩ ' + t('возврат') + ' · ' + t(METHNAME[x.method] || 'наличные') : x.kind === 'deposit' ? '💳 ' + t('предоплата') : t(METHNAME[x.method] || 'наличные');
-    return '<tr' + (ref ? ' class="rrefund"' : '') + '><td class="num">' + esc(x.at) + '</td><td><b>' + esc(x.client_name || '—') + '</b>' + (x.finished ? ' <span class="small muted">✔ ' + t('прошёл') + '</span>' : '') + '<br><span class="small muted">' + esc(x.doctor_name || '') + (x.service ? ' · ' + esc(x.service) : '') + '</span></td><td class="r"><span class="num ' + (a < 0 ? 'neg' : 'pos') + '"><b>' + (a < 0 ? '−' : '+') + fmt(Math.abs(a)) + '</b></span><br><span class="small muted">' + how + '</span></td></tr>';
-  }).join('') + '</tbody><tfoot><tr><td colspan="2"><b>' + t('Пациентов: {n}', { n: vis }) + '</b></td><td class="r num"><b>' + fmt(sum) + '</b></td></tr></tfoot></table></div></div>';
+    return '<tr' + (ref ? ' class="rrefund"' : '') + '><td class="num">' + esc(x.at) + '</td><td><b>' + esc(x.client_name || '—') + '</b>' + (x.finished ? '<br><span class="small muted">✔ ' + t('прошёл') + '</span>' : '') + '</td><td>' + esc(x.doctor_name || '') + (x.service ? '<br><span class="small muted">' + esc(x.service) + '</span>' : '') + '</td><td class="r"><span class="num ' + (a < 0 ? 'neg' : 'pos') + '"><b>' + (a < 0 ? '−' : '+') + fmt(Math.abs(a)) + '</b></span><br><span class="small muted">' + how + '</span></td></tr>';
+  }).join('') + '</tbody><tfoot><tr><td colspan="3"><b>' + t('Пациентов: {n}', { n: vis }) + '</b></td><td class="r num"><b>' + fmt(sum) + '</b></td></tr></tfoot></table></div></div>';
   return h;
 }
 
