@@ -503,7 +503,12 @@ export function vSet(S) {
     '<section><h2>' + t('Ставки с зарплаты') + '</h2><div class="panel"><div class="grid">' + inp(S, t('НДФЛ, %'), 'tax.ndfl', 'num') + inp(S, t('ИНПС, %'), 'tax.inps', 'num') + inp(S, t('Социальный налог, %'), 'tax.soc', 'num') + '</div></div>' +
     '<p class="note">' + t('Ставки по умолчанию взяты на 2026 год и сверены 10.10.2026. Налог на прибыль считается упрощённо, от прибыли каждого месяца. Перед сдачей отчётности сверяйте суммы с бухгалтером и my.soliq.uz: программа ведёт внутренний учёт и официальную отчётность не заменяет.') + '</p></section>' +
     '';
-  var dataHtml = syncBlock(S) + appsBlock() +
+  var wipeRow = function (id, title, desc) { return '<li><div class="li-main"><b>' + t(title) + '</b><span class="small muted">' + t(desc) + '</span></div><button type="button" class="btn ghost danger" data-act="wipe" data-id="' + id + '"' + (S.wipeBusy ? ' disabled' : '') + '>' + t('Удалить') + '</button></li>'; };
+  var wipeHtml = '<section><h2>' + t('Очистка данных') + '</h2><div class="panel"><p class="small muted">' + t('Удаляйте данные по отдельности или всё сразу, чтобы начать с чистого листа. Удалённое не вернуть, поэтому сначала скачайте резервную копию. Врачи, услуги, цены предоплаты, карта, адрес и сотрудники не удаляются.') + '</p><ul class="list">' +
+    wipeRow('appointments', 'Записи и приёмы', 'Все записи «Ресепшена»: оплаты, возвраты, неявки и фото чеков.') + wipeRow('clients', 'Клиенты', 'База клиентов «Ресепшена» с историей.') + wipeRow('receipts', 'Фото чеков', 'Только фотографии чеков в хранилище.') + wipeRow('bot', 'Состояния бота', 'Выбранный язык и незаконченные записи в Telegram-боте.') +
+    wipeRow('ops', 'Операции и зарплата', 'Доходы, расходы и зарплата по всем месяцам в «Главном».') + wipeRow('loan', 'Кредит и аренда', 'Суммы, сроки и цель кредита, аренда.') + wipeRow('assets', 'Техника и оборудование', 'Список техники с амортизацией.') + wipeRow('staff', 'Сотрудники клиники', 'Список сотрудников и ставки в «Главном».') +
+    '</ul><div class="row gaptop"><button type="button" class="btn danger solid" data-act="wipe" data-id="all"' + (S.wipeBusy ? ' disabled' : '') + '>' + t('Удалить всё и начать с нуля') + '</button></div></div></section>';
+  var dataHtml = syncBlock(S) + appsBlock() + wipeHtml +
     '<section><h2>' + t('Резервная копия') + '</h2><div class="panel">' +
     '<div class="row"><button class="btn" data-act="backup-save">' + t('Скачать резервную копию') + '</button><button class="btn ghost" data-act="backup-load">' + t('Загрузить из копии') + '</button></div>' +
     '<input id="backup-file" type="file" accept="application/json,.json" hidden></div>' +

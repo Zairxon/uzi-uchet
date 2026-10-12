@@ -131,6 +131,39 @@ function openTab(id) {
   if (id === 'ops') dayRcLoad(); if (id === 'ops' || id === 'home') { rcSync(S.M); rcSync(ymOf(today())); }
 }
 
+/* ---------- очистка данных ---------- */
+var WIPE_NAME = { appointments: 'Записи и приёмы', clients: 'Клиенты', receipts: 'Фото чеков', bot: 'Состояния бота', ops: 'Операции и зарплата', loan: 'Кредит и аренда', assets: 'Техника и оборудование', staff: 'Сотрудники клиники' };
+var WIPE_SERVER = ['appointments', 'clients', 'receipts', 'bot'];
+function wipeLocal(ids) {
+  var cfg = clone(S.cfg), months = S.months;
+  if (ids.indexOf('loan') >= 0) { cfg.loan = clone(DEF.loan); cfg.rent = clone(DEF.rent); }
+  if (ids.indexOf('assets') >= 0) cfg.assets = [];
+  if (ids.indexOf('staff') >= 0) cfg.staff = [];
+  if (ids.indexOf('ops') >= 0) months = {};
+  return (db ? store.replaceAll(cfg, months) : Promise.resolve()).then(function () {
+    S.cfg = merge(DEF, cfg); S.months = {};
+    Object.keys(months).forEach(function (k) { S.months[k] = months[k]; });
+    queueSync();
+  });
+}
+function wipe(id) {
+  if (S.wipeBusy) return;
+  var all = id === 'all', ids = all ? Object.keys(WIPE_NAME) : [id];
+  var server = ids.filter(function (x) { return WIPE_SERVER.indexOf(x) >= 0; }), local = ids.filter(function (x) { return WIPE_SERVER.indexOf(x) < 0; });
+  if (server.length && (!sync.enabled || !S.sync.user)) { toast(T('Войдите в «Настройки → Данные» (синхронизация): записи клиники удаляются на сервере.')); return; }
+  var text = all ? T('Удалить ВСЕ данные клиники (записи, клиентов, чеки, операции, кредит, технику, сотрудников) и начать с нуля? Это нельзя отменить.') : T('Удалить: {n}? Это нельзя отменить.', { n: T(WIPE_NAME[id]) });
+  askConfirm(text, T('Удалить'), T('Назад')).then(function (ok) {
+    if (!ok) return null;
+    if (!all) return true;
+    return askConfirm(T('Последнее подтверждение: все данные будут стёрты. Резервную копию вы скачали?'), T('Да, удалить всё'), T('Назад'));
+  }).then(function (ok) {
+    if (!ok) return null;
+    S.wipeBusy = true; render();
+    var p = server.length ? clinic.purgeData(server) : Promise.resolve();
+    return p.then(function () { return local.length ? wipeLocal(local) : null; }).then(function () { toast(T('Готово: данные удалены')); }).catch(fail).then(function () { S.wipeBusy = false; render(); if (server.length) { S.dayRc.rows = []; S.clinic.rows = []; } });
+  });
+}
+
 /* ---------- источники клиентов ---------- */
 function srcState() { if (!S.src) S.src = { state: 'idle', rows: [], msg: '', u: { source: 'instagram', custom: '', medium: 'bio', campaign: '' } }; return S.src; }
 function loadSrc() {
@@ -323,6 +356,7 @@ document.addEventListener('click', function (ev) {
   else if (act === 'sync-now') doSync(true);
   else if (act === 'sync-logout') { sync.signOut().then(function () { S.sync.user = null; S.sync.state = 'idle'; render(); toast(T('Вы вышли. Данные остались на этом устройстве')); }); }
   else if (act === 'backup-save') backupSave();
+  else if (act === 'wipe') wipe(id);
   else if (act === 'backup-load') { var fi = document.getElementById('backup-file'); if (fi) fi.click(); }
 });
 document.addEventListener('input', function (ev) {
