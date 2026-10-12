@@ -25,6 +25,7 @@ import { parseDate, maskDate, openCal, closeCal } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
 import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff } from './views.js';
 import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js';
+window.__appReady = true;
 
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
