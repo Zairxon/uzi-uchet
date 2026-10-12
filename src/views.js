@@ -84,8 +84,8 @@ function opTime(o) {
 }
 
 function opRow(S, o, canDel) {
-  var rc = String(o.id).indexOf('rc:') === 0, name = rc ? (o.id.split(':')[3] === 'deposit' ? t('Ресепшен: предоплаты ({n})', { n: o.cnt || '' }) : t('Ресепшен: приём ({n})', { n: o.cnt || '' })) : (CATNAME[o.c] ? t(CATNAME[o.c]) : o.c);
-  return '<li><div class="li-main"><b>' + esc(name) + (rc ? ' <span class="chip">' + t('авто') + '</span>' : '') + '</b><span class="small muted">' + (opTime(o) ? opTime(o) + ' · ' : '') + t(ACCTNAME[o.acct] || 'касса') + (o.n ? ' · ' + esc(o.n) : '') + '</span></div><span class="num ' + (o.t === 'income' ? 'pos' : 'neg') + '">' + (o.t === 'income' ? '+' : '−') + fmt(o.a) + '</span>' + (canDel && !rc ? delBtn(S, 'del-op', o.id) : '') + '</li>';
+  var rc = String(o.id).indexOf('rc:') === 0, name = rc ? (o.id.split(':')[3] === 'deposit' ? t('Ресепшен: предоплаты ({n})', { n: o.cnt || '' }) : o.id.split(':')[3] === 'refund' ? t('Ресепшен: возвраты ({n})', { n: o.cnt || '' }) : t('Ресепшен: приём ({n})', { n: o.cnt || '' })) : (CATNAME[o.c] ? t(CATNAME[o.c]) : o.c);
+  return '<li><div class="li-main"><b>' + esc(name) + (rc ? ' <span class="chip">' + t('авто') + '</span>' : '') + '</b><span class="small muted">' + (opTime(o) ? opTime(o) + ' · ' : '') + t(ACCTNAME[o.acct] || 'касса') + (o.n ? ' · ' + esc(o.n) : '') + '</span></div><span class="num ' + ((o.t === 'income') === ((o.a || 0) >= 0) ? 'pos' : 'neg') + '">' + ((o.t === 'income') === ((o.a || 0) >= 0) ? '+' : '−') + fmt(Math.abs(o.a || 0)) + '</span>' + (canDel && !rc ? delBtn(S, 'del-op', o.id) : '') + '</li>';
 }
 var METHNAME = { cash: 'наличные', card: 'карта', transfer: 'перечисление' };
 // Пациенты из «Ресепшена» за выбранный день
@@ -96,11 +96,11 @@ function rcBlock(S, day) {
   if (R.state === 'error') return h + '<p class="small muted">' + t('Не удалось получить данные клиники: {m}', { m: esc(R.msg) }) + '</p></div>';
   if (!R.rows.length) return h + '<p class="small muted">' + t('В этот день оплат из «Ресепшена» не было.') + '</p></div>';
   var sum = 0, vis = 0;
-  R.rows.forEach(function (x) { sum += +x.amount; if (x.kind === 'visit') vis++; });
-  h += '<ul class="list">' + R.rows.map(function (x) {
-    return '<li><div class="li-main"><b>' + esc(x.client_name || '—') + '</b><span class="small muted">' + esc(x.at) + ' · ' + esc(x.doctor_name || '') + (x.service ? ' · ' + esc(x.service) : '') + (x.finished ? ' · ✔ ' + t('прошёл') : '') + '</span></div>' +
-      '<span class="rcm">' + (x.kind === 'deposit' ? '💳 ' + t('предоплата') : t(METHNAME[x.method] || 'наличные')) + '</span><span class="num pos">+' + fmt(x.amount) + '</span></li>';
-  }).join('') + '</ul><p class="small"><b>' + t('Пациентов: {n}', { n: vis }) + '</b> · ' + t('Поступило: {s} сум', { s: '<span class="num">' + fmt(sum) + '</span>' }) + '</p></div>';
+  R.rows.forEach(function (x) { var a = x.kind === 'refund' ? -x.amount : +x.amount; sum += a; if (x.kind === 'visit') vis++; });
+  h += '<div class="scroll"><table class="rct"><thead><tr><th>' + t('Время') + '</th><th>' + t('Пациент') + ' / ' + t('Врач') + '</th><th class="r">' + t('Оплата') + ' / ' + t('Сумма') + '</th></tr></thead><tbody>' + R.rows.map(function (x) {
+    var ref = x.kind === 'refund', a = ref ? -x.amount : +x.amount, how = ref ? '↩ ' + t('возврат') + ' · ' + t(METHNAME[x.method] || 'наличные') : x.kind === 'deposit' ? '💳 ' + t('предоплата') : t(METHNAME[x.method] || 'наличные');
+    return '<tr' + (ref ? ' class="rrefund"' : '') + '><td class="num">' + esc(x.at) + '</td><td><b>' + esc(x.client_name || '—') + '</b>' + (x.finished ? ' <span class="small muted">✔ ' + t('прошёл') + '</span>' : '') + '<br><span class="small muted">' + esc(x.doctor_name || '') + (x.service ? ' · ' + esc(x.service) : '') + '</span></td><td class="r"><span class="num ' + (a < 0 ? 'neg' : 'pos') + '"><b>' + (a < 0 ? '−' : '+') + fmt(Math.abs(a)) + '</b></span><br><span class="small muted">' + how + '</span></td></tr>';
+  }).join('') + '</tbody><tfoot><tr><td colspan="2"><b>' + t('Пациентов: {n}', { n: vis }) + '</b></td><td class="r num"><b>' + fmt(sum) + '</b></td></tr></tfoot></table></div></div>';
   return h;
 }
 
@@ -284,6 +284,37 @@ export function vLoan(S) {
   return h;
 }
 
+function loanRep(S, C) {
+  var cfg = S.cfg, M = S.M, l = cfg.loan, B = C.B, started = !!(l.amount && ymOf(l.start) && ymOf(l.start) <= M), SC = sched(l, ymOf(l.start) || M), h = '';
+  var acc = 0, nextPay = null; SC.forEach(function (x) { if (x.m <= M) acc += x.int; if (x.m === addM(M, 1)) nextPay = x; });
+  var info = {}; cfg.assets.forEach(function (a) { info['asset:' + a.id] = (a.name || '') + (a.model ? ' (' + a.model + ')' : ''); });
+  Object.keys(S.months).forEach(function (m) { ((S.months[m] && S.months[m].ops) || []).forEach(function (o) { if (o.t === 'expense' && o.c === 'equip') info['op:' + o.id] = o.n || ''; }); });
+  var why = l.purpose === 'other' ? '' : (info[l.purpose] || ''); if (l.purposeNote) why = (why ? why + ' · ' : '') + l.purposeNote;
+  h += '<section><h2>' + t('Кредит') + '</h2>';
+  if (!l.amount) h += '<p class="empty">' + t('Кредит не указан. Заполните его на вкладке «Кредит и аренда».') + '</p></section>';
+  else {
+    h += '<div class="scroll"><table><tbody>' +
+      tr('Сумма кредита', [l.amount]) + (why ? '<tr><td>' + t('На что взят кредит') + '</td><td class="r">' + esc(why) + '</td></tr>' : '') +
+      '<tr><td>' + t('Получен') + '</td><td class="r">' + esc(fmtDate(l.start) || '—') + '</td></tr>' +
+      '<tr><td>' + t('Ставка в год') + '</td><td class="r">' + String(l.rate).replace('.', ',') + '%</td></tr>' +
+      '<tr><td>' + t('Срок, месяцев') + '</td><td class="r">' + l.term + '</td></tr>' +
+      tr('Выплачено основного долга', [started ? l.amount - B.loan : 0]) + tr('Остаток долга', [started ? B.loan : 0], 'sum') +
+      tr('Проценты, начислено к месяцу', [started ? acc : 0]) + tr('Платёж в следующем месяце', [started && nextPay ? nextPay.pr + nextPay.int : 0]) + '</tbody></table></div></section>';
+  }
+  h += '<section><h2>' + t('Техника и оборудование') + '</h2>';
+  var items = []; cfg.assets.forEach(function (a) { items.push({ id: 'asset:' + a.id, name: (a.name || t('без названия')) + (a.model ? ' (' + a.model + ')' : ''), cost: a.cost || 0, ym: ymOf(a.date), life: Math.max(1, a.life || 1) }); });
+  Object.keys(S.months).sort().forEach(function (m) { ((S.months[m] && S.months[m].ops) || []).forEach(function (o) { if (o.t === 'expense' && o.c === 'equip') items.push({ id: 'op:' + o.id, name: o.n || t('Покупка техники'), cost: o.a || 0, ym: ymOf(o.d) || m, life: 60 }); }); });
+  if (!items.length) h += '<p class="empty">' + t('Техника не добавлена.') + '</p>';
+  else {
+    h += '<div class="scroll"><table><thead><tr><th>' + t('Название') + '</th><th class="r">' + t('Стоимость') + '</th><th class="r">' + t('Амортизация в месяц') + '</th><th class="r">' + t('Остаточная стоимость') + '</th></tr></thead><tbody>' + items.map(function (x) {
+      var k = x.ym ? idx2(M) - idx2(x.ym) : 0, dep = k >= 1 ? Math.min(k, x.life) * x.cost / x.life : 0;
+      return '<tr><td>' + esc(x.name) + (x.ym ? '<br><span class="small muted">' + esc(fmtM ? x.ym : x.ym) + '</span>' : '') + (l.purpose === x.id ? ' <span class="chip">' + t('Куплено в кредит') + '</span>' : '') + '</td><td class="r num">' + fmt(x.cost) + '</td><td class="r num">' + fmt(x.cost / x.life) + '</td><td class="r num">' + fmt(Math.max(0, x.cost - dep)) + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  }
+  return h + '</section>';
+}
+function idx2(ym) { return (+ym.slice(0, 4)) * 12 + (+ym.slice(5, 7)) - 1; }
+
 export function vRep(S, C) {
   var cfg = S.cfg, M = S.M, mn = months()[+M.slice(5, 7) - 1];
   var r = C.cur, y = ytd(C.rows, M), B = C.B, c = r.cf;
@@ -319,9 +350,9 @@ export function vRep(S, C) {
     tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div></section>';
   var balN = '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p>';
   // один отчёт на экране: таблицы на всю ширину, переключатель сверху
-  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, cmp: cmpH + cmpRest };
+  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), cmp: cmpH + cmpRest };
   var rv = blocks[S.repView] ? S.repView : 'pl';
-  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['cmp', 'Налоги']].map(function (x) {
+  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['cmp', 'Налоги']].map(function (x) {
     return '<button type="button" role="tab" data-act="rep-view" data-id="' + x[0] + '" aria-pressed="' + (rv === x[0]) + '">' + t(x[1]) + '</button>';
   }).join('') + '</div>';
   return nav + blocks[rv];

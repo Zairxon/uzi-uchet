@@ -32,7 +32,7 @@ var S = {
   draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
 };
 var db = false, ready = false, rendering = false;
-try { var rv0 = localStorage.getItem('uzi-rep'); if (['pl', 'cash', 'bal', 'cmp'].indexOf(rv0) >= 0) S.repView = rv0; } catch (e) { /* без запоминания */ }
+try { var rv0 = localStorage.getItem('uzi-rep'); if (['pl', 'cash', 'bal', 'loan', 'cmp'].indexOf(rv0) >= 0) S.repView = rv0; } catch (e) { /* без запоминания */ }
 // при входе всегда открывается «Обзор»
 
 /* ---------- тема: как в системе → светлая → тёмная ---------- */
@@ -145,7 +145,7 @@ function rcSync(ym) {
   return clinic.role().then(function (role) { return role === 'owner' ? clinic.incomeByDay(r.from, r.to) : null; }).then(function (rows) {
     if (!rows) return;
     var want = {};
-    rows.forEach(function (x) { var tot = Math.round(+x.total); if (!(tot > 0)) return; var id = 'rc:' + x.d + ':' + x.method + ':' + x.kind; want[id] = { id: id, d: x.d, t: 'income', c: 'usl', a: tot, acct: x.method, cnt: +x.n, src: 'rc' }; });
+    rows.forEach(function (x) { var tot = Math.round(+x.total); if (!(tot > 0)) return; if (x.kind === 'refund') tot = -tot; var id = 'rc:' + x.d + ':' + x.method + ':' + x.kind; want[id] = { id: id, d: x.d, t: 'income', c: 'usl', a: tot, acct: x.method, cnt: +x.n, src: 'rc' }; });
     var doc = S.months[ym] || { ops: [] }, changed = false;
     var keep = (doc.ops || []).filter(function (o) {
       if (String(o.id).indexOf('rc:') !== 0) return true;

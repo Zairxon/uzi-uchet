@@ -423,3 +423,7 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .cell .chev{transition:transform .2s}.cell[aria-expanded="true"] .chev{transform:rotate(180deg)}
 .stafflist{margin-top:8px}
 .srow{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+
+.rct{font-size:12.5px}.rct th,.rct td{padding:6px 6px;text-align:left;vertical-align:top}.rct th.r,.rct td.r{text-align:right;white-space:nowrap}
+.rct tbody tr{border-bottom:1px solid var(--line)}.rct tfoot td{border-top:2px solid var(--line);padding-top:8px}
+.rct tr.rrefund td{color:var(--bad)}
