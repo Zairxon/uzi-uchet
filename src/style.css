@@ -443,11 +443,11 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .rct.grid thead{display:table-header-group!important}.rct.grid tbody{display:table-row-group!important}.rct.grid tfoot{display:table-footer-group!important}
 .rct.grid tr{display:table-row!important}.rct.grid th,.rct.grid td{display:table-cell!important}
 
-/* пациенты дня: как таблица «Сводка» в «Ресепшене» */
-.rct2{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:14px}
-.rct2 th{background:transparent;color:var(--muted);font-size:13px;font-weight:500;text-align:left;padding:10px 12px;position:static}
-.rct2 td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:middle;text-align:left}
-.rct2 th.r,.rct2 td.r{text-align:right;white-space:nowrap}
-.rct2 td.lbl b{font-weight:500;font-size:15px}
-.rct2 tr.sum td{background:color-mix(in srgb,var(--accent) 8%,transparent);font-weight:700;font-size:15px}
-.rct2 tr.rrefund td{color:var(--bad)}
+/* пациенты дня: одна внешняя граница, внутри линии между ячейками */
+.rcbox{border:0!important;background:transparent!important;padding:0!important}
+.rcbox h3{padding:0 2px 6px}
+.rcbox .scroll{border:1px solid color-mix(in srgb,var(--ink) 28%,transparent);border-radius:12px}
+.rct.grid{border:0!important;border-collapse:collapse}
+.rct.grid th,.rct.grid td{border-width:0 1px 1px 0!important}
+.rct.grid th:last-child,.rct.grid td:last-child{border-right:0!important}
+.rct.grid tfoot td{border-bottom:0!important}
