@@ -46,3 +46,7 @@ export async function savePrepay(s, svcs, removed) {
   for (const id of removed) { const d = await sb.from('booking_services').delete().eq('id', id); if (d.error) throw d.error; }
   if (svcs.length) { const u = await sb.from('booking_services').upsert(svcs, { onConflict: 'id' }); if (u.error) throw u.error; }
 }
+
+// Поступления из «Ресепшена»: по дням и способам оплаты (для учёта) и список пациентов дня (для отчёта)
+export async function incomeByDay(from, to) { const r = await sb.rpc('income_by_day', { p_from: from, p_to: to }); if (r.error) throw r.error; return r.data || []; }
+export async function dayReceipts(day) { const r = await sb.rpc('day_receipts', { p_date: day }); if (r.error) throw r.error; return r.data || []; }
