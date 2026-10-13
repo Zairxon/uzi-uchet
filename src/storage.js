@@ -229,8 +229,8 @@ export function markAllDirty() {
   });
 }
 
-export function downloadText(filename, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+export function downloadText(filename, text, mime) {
+  const url = URL.createObjectURL(new Blob([text], { type: mime || 'application/json' }));
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();

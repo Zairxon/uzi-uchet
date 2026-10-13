@@ -462,3 +462,13 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .tips li>span:last-child{flex:1;min-width:0;line-height:1.4}
 .legal{margin-top:10px}
 .legal summary{cursor:pointer;font-weight:700;padding:8px 0;color:var(--accent)}
+
+/* флажки в формах, печать */
+.chkrow{display:flex;align-items:center;gap:10px;margin:8px 0;cursor:pointer;color:var(--ink)}
+.chkrow input{width:20px;height:20px;accent-color:var(--accent);flex:0 0 auto}
+.repTools{margin:10px 0}
+@media print{
+  header,.tabbar,nav,.seg,.row,.btn,#toast,#alerts,footer,.repTools,.cell{display:none!important}
+  body{background:#fff!important;color:#000!important}
+  .panel,section{box-shadow:none!important;border-color:#bbb!important;break-inside:avoid}
+}

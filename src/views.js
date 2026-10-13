@@ -89,6 +89,11 @@ function tipsView(S, C) {
     if (r.int / r.rev > 0.1) add('warn', t('Проценты по кредиту — {p}% выручки месяца. Если нагрузка растёт, обсудите с банком график или досрочное погашение.', { p: pc(r.int / r.rev) }));
     if (r.opex.ads && r.opex.ads / r.rev > 0.15) add('warn', t('На рекламу ушло {p}% выручки. Сверьте с отчётом «Откуда клиенты»: какие источники реально приводят людей.', { p: pc(r.opex.ads / r.rev) }));
   }
+  var noChk = 0, noChkSum = 0; (((S.months[S.M] || {}).ops) || []).forEach(function (o) { if (o.t === 'income' && o.c !== 'contrib' && o.chk === false) { noChk++; noChkSum += o.a || 0; } });
+  if (noChk) add('bad', t('В этом месяце {n} поступлений без чека на {s} сум. Каждую оплату нужно оформлять фискальным чеком.', { n: noChk, s: fmt(noChkSum) }));
+  if (S.pp && S.pp.s && S.pp.s.card_number && !cfg.cardFirm) add('bad', t('Предоплата принимается на карту, которая не отмечена как карта фирмы. Уточните, на кого она оформлена: деньги на личной карте могут считаться неучтённым доходом.'));
+  var pm = addM(S.M, -1), pmOps = ((S.months[pm] || {}).ops || []).length;
+  if (pmOps && !(cfg.locked && cfg.locked[pm]) && +today().slice(8, 10) > 10 && S.M === today().slice(0, 7)) add('warn', t('Прошлый месяц ({m}) ещё не закрыт. Сверьте цифры и закройте его на вкладке «Операции», чтобы записи нельзя было случайно изменить.', { m: lc(pm) }));
   if (exp > 0 && B.cash + B.bank < exp) add('warn', t('Денег на счетах и в кассе меньше, чем расходов за месяц ({n} сум). Держите запас хотя бы на один-два месяца работы.', { n: fmt(exp) }));
   if (B.pay.tax > Math.max(1, r.rev * 0.5)) add('warn', t('Накопился неуплаченный налог: {n} сум. Налог платится в срок, иначе начисляются пени, а деньги нужно держать отдельно.', { n: fmt(B.pay.tax) }));
   if (B.pay.wage > Math.max(1, r.payroll * 1.5)) add('warn', t('Зарплата и налоги с неё начислены, но не выплачены на {n} сум. Проверьте, что выплаты внесены в «Операции».', { n: fmt(B.pay.wage) }));
@@ -127,7 +132,7 @@ function opTime(o) {
 
 function opRow(S, o, canDel) {
   var rc = String(o.id).indexOf('rc:') === 0, name = rc ? (o.id.split(':')[3] === 'deposit' ? t('Ресепшен: предоплаты ({n})', { n: o.cnt || '' }) : o.id.split(':')[3] === 'refund' ? t('Ресепшен: возвраты ({n})', { n: o.cnt || '' }) : t('Ресепшен: приём ({n})', { n: o.cnt || '' })) : (CATNAME[o.c] ? t(CATNAME[o.c]) : o.c);
-  return '<li><div class="li-main"><b>' + esc(name) + (rc ? ' <span class="chip">' + t('авто') + '</span>' : '') + '</b><span class="small muted">' + (opTime(o) ? opTime(o) + ' · ' : '') + t(ACCTNAME[o.acct] || 'касса') + (o.n ? ' · ' + esc(o.n) : '') + '</span></div><span class="num ' + ((o.t === 'income') === ((o.a || 0) >= 0) ? 'pos' : 'neg') + '">' + ((o.t === 'income') === ((o.a || 0) >= 0) ? '+' : '−') + fmt(Math.abs(o.a || 0)) + '</span>' + (canDel && !rc ? delBtn(S, 'del-op', o.id) : '') + '</li>';
+  return '<li><div class="li-main"><b>' + esc(name) + (rc ? ' <span class="chip">' + t('авто') + '</span>' : '') + (!rc && o.t === 'income' && o.chk === false ? ' <span class="chip warn">' + t('без чека') + '</span>' : '') + '</b><span class="small muted">' + (opTime(o) ? opTime(o) + ' · ' : '') + t(ACCTNAME[o.acct] || 'касса') + (o.n ? ' · ' + esc(o.n) : '') + '</span></div><span class="num ' + ((o.t === 'income') === ((o.a || 0) >= 0) ? 'pos' : 'neg') + '">' + ((o.t === 'income') === ((o.a || 0) >= 0) ? '+' : '−') + fmt(Math.abs(o.a || 0)) + '</span>' + (canDel && !rc ? delBtn(S, 'del-op', o.id) : '') + '</li>';
 }
 var METHNAME = { cash: 'наличные', card: 'карта', transfer: 'перечисление' };
 // Пациенты из «Ресепшена» за выбранный день
@@ -157,7 +162,7 @@ export function vOps(S) {
     '<label class="fld"><span>' + t('Сумма, сум') + '</span><input id="op-amount" type="text" inputmode="numeric" class="n" data-d="amount" data-kind="money" value="' + esc(draft.amount) + '" placeholder="0"></label>' +
     '<label class="fld"><span>' + t('Категория') + '</span>' + sel('op-cat', cats, draft.cat, 'data-d="cat"') + '</label>' +
     '<label class="fld"><span>' + t('Счёт') + '</span>' + sel('op-acct', ACCTS, draft.acct, 'data-d="acct"') + '</label>' +
-    '</div><label class="fld"><span>' + t('Комментарий') + '</span><input id="op-note" type="text" data-d="note" value="' + esc(draft.note) + '" placeholder="' + esc(t(draft.cat === 'equip' ? 'Название и модель, например: УЗИ-аппарат Миндрей ДС-70' : 'Например: закупка расходников')) + '"></label>' +
+    '</div>' + (draft.type === 'income' && draft.cat !== 'contrib' ? '<label class="chkrow"><input type="checkbox" data-d="chk"' + (draft.chk !== false ? ' checked' : '') + '><span>' + t('Чек выдан клиенту') + '</span></label>' : '') + '<label class="fld"><span>' + t('Комментарий') + '</span><input id="op-note" type="text" data-d="note" value="' + esc(draft.note) + '" placeholder="' + esc(t(draft.cat === 'equip' ? 'Название и модель, например: УЗИ-аппарат Миндрей ДС-70' : 'Например: закупка расходников')) + '"></label>' +
     (draft.cat === 'equip' ? '<p class="note">' + t('Купленная техника записывается как имущество и списывается в расходы по частям (60 месяцев). В «Кредит и аренда» её можно выбрать как цель кредита.') + '</p>' : '') +
     (draft.acct === 'founder' ? '<p class="note">' + t('«Учредитель»: оплата из личных денег учредителя. Деньги клиники не меняются, сумма записывается как вклад учредителя.') + '</p>' : '') +
     '<div class="row gaptop"><button class="btn" type="submit">' + t('Добавить') + '</button></div></form>' +
@@ -167,16 +172,18 @@ export function vOps(S) {
   h += '<section class="opsday"><h2>' + t('Операции за день') + '</h2>' +
     '<div class="daynav2"><button type="button" class="navbtn" data-act="ops-prev" aria-label="' + esc(t('Предыдущий день')) + '">‹</button><button type="button" class="daylabel2" data-act="ops-today">' + (isToday ? t('Сегодня') + ' · ' : '') + esc(fmtDate(day)) + '</button><button type="button" class="navbtn" data-act="ops-next" aria-label="' + esc(t('Следующий день')) + '">›</button></div>' +
     kpi3(f) + rcBlock(S, day) +
-    '<h3 class="subh">' + t('Остальные операции дня') + '</h3>' + (dops.length ? '<ul class="list">' + dops.map(function (o) { return opRow(S, o, true); }).join('') + '</ul>' : '<p class="empty">' + t('Других операций в этот день нет.') + '</p>') + '</section>';
+    '<h3 class="subh">' + t('Остальные операции дня') + '</h3>' + (dops.length ? '<ul class="list">' + dops.map(function (o) { return opRow(S, o, !(S.cfg.locked && S.cfg.locked[o.d.slice(0, 7)])); }).join('') + '</ul>' : '<p class="empty">' + t('Других операций в этот день нет.') + '</p>') + '</section>';
   // месяц
   var mops = ((months_[M] && months_[M].ops) || []).slice().sort(sorter), mi = 0, me = 0;
   mops.forEach(function (o) { if (o.t === 'income') { if (o.c !== 'contrib') mi += o.a || 0; } else me += o.a || 0; });
-  h += '<section class="opsmonth"><h2>' + t('Операции за {m}', { m: lc(M) }) + '</h2>' + kpi3({ inc: mi, exp: me, net: mi - me });
+  var lk = !!(S.cfg.locked && S.cfg.locked[M]);
+  h += '<section class="opsmonth"><h2>' + t('Операции за {m}', { m: lc(M) }) + (lk ? ' <span class="chip">🔒 ' + t('закрыт') + '</span>' : '') + '</h2>' + kpi3({ inc: mi, exp: me, net: mi - me }) +
+    '<div class="row"><button type="button" class="btn ghost" data-act="lock-toggle">' + t(lk ? 'Открыть месяц' : 'Закрыть месяц') + '</button><button type="button" class="btn ghost" data-act="export-ops">' + t('Скачать для бухгалтера') + '</button></div>' + (lk ? '<p class="note">' + t('Месяц закрыт: операции и зарплату за него менять нельзя. Откройте месяц, если нужно что-то исправить.') + '</p>' : '');
   if (!mops.length) h += '<p class="empty">' + t('Пока нет записей. Добавьте первое поступление или списание в форме выше.') + '</p>';
   else {
     h += '<ul class="list">'; var dd = ''; mops.forEach(function (o) {
       if (o.d !== dd) { dd = o.d; h += '<li class="day" style="border-bottom:0;padding-bottom:0">' + esc(o.d.slice(8, 10) + '.' + o.d.slice(5, 7)) + '</li>'; }
-      h += opRow(S, o, true);
+      h += opRow(S, o, !lk);
     }); h += '</ul>';
   }
   return h + '</section>';
@@ -457,7 +464,8 @@ export function vRep(S, C) {
   var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['src', 'Источники'], ['cmp', 'Налоги']].map(function (x) {
     return '<button type="button" role="tab" data-act="rep-view" data-id="' + x[0] + '" aria-pressed="' + (rv === x[0]) + '">' + t(x[1]) + '</button>';
   }).join('') + '</div>';
-  return nav + blocks[rv];
+  var tools = '<div class="row repTools"><button type="button" class="btn ghost" data-act="export-year">' + t('Скачать отчёт за год') + '</button><button type="button" class="btn ghost" data-act="print">' + t('Печать') + '</button></div>';
+  return nav + tools + blocks[rv];
 }
 
 function lookBlock(S) { return ''; }
@@ -538,6 +546,7 @@ function prepayBlock(S) {
   if (P.state === 'error') return h + '<p class="alert">' + t('Не удалось получить данные клиники: {m}', { m: esc(P.msg) }) + '</p></section>';
   var s = P.s, f = function (label, key, ph, mode, extra) { return '<label class="fld"><span>' + t(label) + '</span><input type="text" data-pp="' + key + '"' + (mode ? ' inputmode="' + mode + '"' : '') + (extra || '') + ' value="' + esc(s[key] == null ? '' : s[key]) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + '></label>'; };
   h += '<div class="panel">' + f('Номер карты', 'card_number', '8600 0000 0000 0000', 'numeric', ' maxlength="19"') + f('Владелец карты', 'card_holder') + f('Telegram для чека (кому отправить)', 'receipt_contact', '@username') + f('Время удержания брони, минут', 'hold_minutes', '30', 'numeric') + '</div>' +
+    '<label class="chkrow"><input type="checkbox" data-bind="cardFirm"' + (S.cfg.cardFirm ? ' checked' : '') + '><span>' + t('Карта оформлена на фирму, а не на частное лицо') + '</span></label>' + (S.cfg.cardFirm ? '' : '<p class="note">' + t('Если карта личная, налоговая может считать поступления на неё неучтённым доходом. Лучше принимать предоплату на счёт или карту фирмы.') + '</p>') +
     '<p class="note">' + t('Предоплата включается, когда указана карта и есть хотя бы одна услуга ниже. Клиент видит карту, сумму и время на оплату, затем отправляет фото чека.') + '</p>';
   h += '<h2>' + t('Услуги для очереди') + '</h2>' + (P.svc.length ? P.svc.map(function (x, i) {
     var dep = x.fixed !== '' && x.fixed != null ? +x.fixed : Math.round((+x.price || 0) * (+x.percent || 0) / 100);
@@ -565,7 +574,13 @@ export function vSet(S) {
     wipeRow('appointments', 'Записи и приёмы', 'Все записи «Ресепшена»: оплаты, возвраты, неявки и фото чеков.') + wipeRow('clients', 'Клиенты', 'База клиентов «Ресепшена» с историей.') + wipeRow('receipts', 'Фото чеков', 'Только фотографии чеков в хранилище.') + wipeRow('bot', 'Состояния бота', 'Выбранный язык и незаконченные записи в Telegram-боте.') +
     wipeRow('ops', 'Операции и зарплата', 'Доходы, расходы и зарплата по всем месяцам в «Главном».') + wipeRow('loan', 'Кредит и аренда', 'Суммы, сроки и цель кредита, аренда.') + wipeRow('assets', 'Техника и оборудование', 'Список техники с амортизацией.') + wipeRow('staff', 'Сотрудники клиники', 'Список сотрудников и ставки в «Главном».') +
     '</ul><div class="row gaptop"><button type="button" class="btn danger solid" data-act="wipe" data-id="all"' + (S.wipeBusy ? ' disabled' : '') + '>' + t('Удалить всё и начать с нуля') + '</button></div></div></section>';
-  var dataHtml = syncBlock(S) + appsBlock() + wipeHtml +
+  var LOGK = { add: 'Добавлена операция', del: 'Удалена операция', lock: 'Месяц закрыт', unlock: 'Месяц открыт', unaccrue: 'Отменено начисление зарплаты' };
+  var logs = (S.cfg.log || []).slice(0, 40);
+  var logHtml = '<section><h2>' + t('Журнал действий') + '</h2><div class="panel">' + (logs.length ? '<ul class="list">' + logs.map(function (e) {
+    var when = ''; try { when = new Date(e.ts).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (x) { /* без времени */ }
+    return '<li><div class="li-main"><b>' + t(LOGK[e.k] || e.k) + (e.c && CATNAME[e.c] ? ': ' + t(CATNAME[e.c]) : '') + '</b><span class="small muted">' + esc(when) + (e.who ? ' · ' + esc(e.who) : '') + (e.d ? ' · ' + esc(fmtDate(e.d)) : '') + '</span></div>' + (e.a ? '<span class="num">' + fmt(e.a) + '</span>' : '') + '</li>';
+  }).join('') + '</ul>' : '<p class="empty">' + t('Пока записей нет. Здесь видно, кто и когда добавил или удалил операцию и закрыл месяц.') + '</p>') + '</div></section>';
+  var dataHtml = syncBlock(S) + appsBlock() + logHtml + wipeHtml +
     '<section><h2>' + t('Резервная копия') + '</h2><div class="panel">' +
     '<div class="row"><button class="btn" data-act="backup-save">' + t('Скачать резервную копию') + '</button><button class="btn ghost" data-act="backup-load">' + t('Загрузить из копии') + '</button></div>' +
     '<input id="backup-file" type="file" accept="application/json,.json" hidden></div>' +

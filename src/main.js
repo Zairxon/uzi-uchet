@@ -21,7 +21,7 @@ import * as clinic from './clinic.js';
 import { fmtPhoneInput, cleanPhone } from './phone.js';
 import { t as T, getLang, setLang, brand } from './i18n.js';
 import { mountFooter } from './footer.js';
-import { parseDate, maskDate, openCal, closeCal } from './datepicker.js';
+import { parseDate, maskDate, openCal, closeCal, fmtDate } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
 import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff, srcLinksHtml } from './views.js';
 import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js';
@@ -30,9 +30,11 @@ window.__appReady = true;
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
   theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, opsDay: today(), dayRc: { state: 'idle', rows: [], msg: '' }, staffOpen: false, editStaff: '', rcBusy: false, info: { state: 'idle', s: null, d: [], msg: '', busy: false }, setTab: (function () { try { return localStorage.getItem('uzi-settab') || 'clinic'; } catch (e) { return 'clinic'; } })(), pp: { state: 'idle', s: null, svc: [], removed: [], setup: null, msg: '', busy: false }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
-  draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '' },
+  draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '', chk: true },
 };
 var db = false, ready = false, rendering = false;
+var CATNAME_ = {}; CATS.income.concat(CATS.expense).forEach(function (c) { CATNAME_[c[0]] = c[1]; });
+var ACCT_NAME = { cash: 'касса (нал.)', card: 'касса (карта)', founder: 'учредитель', transfer: 'перечисление', bank: 'банк' };
 try { var rv0 = localStorage.getItem('uzi-rep'); if (['pl', 'cash', 'bal', 'loan', 'src', 'cmp'].indexOf(rv0) >= 0) S.repView = rv0; } catch (e) { /* без запоминания */ }
 // при входе всегда открывается «Обзор»
 
@@ -67,6 +69,31 @@ function fail(e) {
 function writeCfg() { if (db) store.saveConfig(S.cfg).then(queueSync).catch(fail); }
 function writeMonth(m) { if (db) store.saveMonth(m, S.months[m]).then(queueSync).catch(fail); }
 function saveCfg() { writeCfg(); render(); }
+// Закрытый месяц: операции и зарплату за него нельзя менять, пока владелец не откроет месяц
+function isLocked(ym) { return !!(S.cfg.locked && S.cfg.locked[ym]); }
+var LOCK_MSG = 'Месяц закрыт. Откройте его на вкладке «Операции», чтобы менять записи.';
+// Журнал действий: кто и что менял (хранится вместе с данными и синхронизируется)
+function logAct(e) {
+  var u = S.sync.user; e.ts = Date.now(); e.who = u ? (u.email || '') : '';
+  S.cfg.log = S.cfg.log || []; S.cfg.log.unshift(e); if (S.cfg.log.length > 300) S.cfg.log.length = 300; writeCfg();
+}
+// Выгрузка для бухгалтера: CSV с разделителем «;» и BOM, Excel открывает его без настройки
+function csvCell(v) { var s = String(v == null ? '' : v); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function csvDownload(name, rows) { store.downloadText(name, '\ufeff' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n') + '\r\n', 'text/csv;charset=utf-8'); }
+function exportOps() {
+  var ops = ((S.months[S.M] && S.months[S.M].ops) || []).slice().sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
+  var rows = [[T('Дата'), T('Тип'), T('Категория'), T('Счёт'), T('Сумма, сум'), T('Чек выдан'), T('Комментарий')]];
+  ops.forEach(function (o) {
+    var rc = String(o.id).indexOf('rc:') === 0, cn = rc ? T('Ресепшен: приём') : (CATNAME_[o.c] ? T(CATNAME_[o.c]) : o.c);
+    rows.push([fmtDate(o.d), T(o.t === 'income' ? 'Поступление' : 'Списание'), cn, T(ACCT_NAME[o.acct] || 'касса (нал.)'), String(Math.round(o.a || 0)), o.t === 'income' && !rc ? T(o.chk === false ? 'нет' : 'да') : '', o.n || '']);
+  });
+  csvDownload('operacii-' + S.M + '.csv', rows); toast(T('Файл скачан: операции за {m}', { m: mName(S.M).toLowerCase() }));
+}
+function exportYear() {
+  var y = S.M.slice(0, 4), C = compute(S.cfg, S.months, y + '-12'), rows = [[T('Месяц'), T('Выручка'), T('Расходы по операциям'), T('Зарплата с социальным налогом'), T('Аренда'), T('Проценты по кредиту'), T('Амортизация'), T('Прибыль до налога'), T('Налог'), T('Чистая прибыль')]];
+  C.rows.filter(function (q) { return q.m.slice(0, 4) === y; }).forEach(function (q) { rows.push([q.m, q.rev, q.opexSum, q.payroll, q.rent, q.int, q.dep, q.preTax, q.tax, q.net].map(function (x, i) { return i === 0 ? x : String(Math.round(x)); })); });
+  csvDownload('otchet-' + y + '.csv', rows); toast(T('Файл скачан: отчёт за {y} год', { y: y }));
+}
 function saveMonth(m) { writeMonth(m); render(); }
 function mdoc(m) { if (!S.months[m]) S.months[m] = { ops: [] }; if (!S.months[m].ops) S.months[m].ops = []; return S.months[m]; }
 function toast(msg) { var el = document.getElementById('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function () { el.hidden = true; }, 3500); }
@@ -183,7 +210,7 @@ function dayRcLoad() {
 }
 // Приём из «Ресепшена» вносится в операции сам: по одной строке на день и способ оплаты, повторно не дублируется
 function rcSync(ym) {
-  if (!sync.enabled || !S.sync.user || S.rcBusy) return Promise.resolve();
+  if (!sync.enabled || !S.sync.user || S.rcBusy || isLocked(ym)) return Promise.resolve();
   S.rcBusy = true; var r = clinic.monthRange(ym);
   return clinic.role().then(function (role) { return role === 'owner' ? clinic.incomeByDay(r.from, r.to) : null; }).then(function (rows) {
     if (!rows) return;
@@ -319,7 +346,7 @@ document.addEventListener('click', function (ev) {
   var b = ev.target.closest('[data-act]'); if (!b) return; var act = b.dataset.act, id = b.dataset.id;
   if (act.indexOf('del-') === 0) {
     if (S.armed !== act + id) { S.armed = act + id; render(); return; } S.armed = null;
-    if (act === 'del-op') { Object.keys(S.months).forEach(function (mk) { var dm = S.months[mk]; if (dm && dm.ops && dm.ops.some(function (o) { return o.id === id; })) { dm.ops = dm.ops.filter(function (o) { return o.id !== id; }); writeMonth(mk); } }); render(); }
+    if (act === 'del-op') { var lockedHit = false; Object.keys(S.months).forEach(function (mk) { var dm = S.months[mk]; if (dm && dm.ops && dm.ops.some(function (o) { return o.id === id; })) { if (isLocked(mk)) { lockedHit = true; return; } var gone = dm.ops.filter(function (o) { return o.id === id; })[0]; dm.ops = dm.ops.filter(function (o) { return o.id !== id; }); writeMonth(mk); logAct({ k: 'del', c: gone.c, a: gone.a, d: gone.d }); } }); if (lockedHit) toast(T(LOCK_MSG)); render(); }
     else if (act === 'del-staff') { S.cfg.staff = S.cfg.staff.filter(function (s) { return s.id !== id; }); saveCfg(); }
     else if (act === 'del-asset') { S.cfg.assets = S.cfg.assets.filter(function (a) { return a.id !== id; }); saveCfg(); }
     return;
@@ -339,6 +366,10 @@ document.addEventListener('click', function (ev) {
   else if (act === 'ops-prev') { S.opsDay = addDays(S.opsDay, -1); dayRcLoad(); }
   else if (act === 'ops-next') { S.opsDay = addDays(S.opsDay, 1); dayRcLoad(); }
   else if (act === 'ops-today') { S.opsDay = today(); dayRcLoad(); }
+  else if (act === 'lock-toggle') { var was = isLocked(S.M); S.cfg.locked = S.cfg.locked || {}; if (was) delete S.cfg.locked[S.M]; else S.cfg.locked[S.M] = true; logAct({ k: was ? 'unlock' : 'lock', d: S.M + '-01' }); render(); toast(T(was ? 'Месяц открыт' : 'Месяц закрыт: записи за него менять нельзя')); }
+  else if (act === 'export-ops') exportOps();
+  else if (act === 'export-year') exportYear();
+  else if (act === 'print') window.print();
   else if (act === 'staff-toggle') { S.staffOpen = !S.staffOpen; render(); }
   else if (act === 'staff-edit') { S.editStaff = S.editStaff === id ? '' : id; render(); }
   else if (act === 'type') { S.draft.type = id; S.draft.cat = CATS[id][0][0]; render(); }
@@ -348,8 +379,8 @@ document.addEventListener('click', function (ev) {
   else if (act === 'pp-add') { S.pp.svc.push({ id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : uid() + uid() + uid(), name_ru: '', name_uz: '', price: 0, percent: 30, fixed: '', active: true, sort: S.pp.svc.length + 1 }); render(); }
   else if (act === 'pp-del') { var dx = S.pp.svc.splice(+id, 1)[0]; if (dx) S.pp.removed.push(dx.id); render(); }
   else if (act === 'loan-toggle') { S.loanOpen = !S.loanOpen; render(); }
-  else if (act === 'accrue') { if (!S.cfg.staff.length) return; if (S.cfg.staff.some(function (s) { return s.pct > 0; }) && S.clinic.state !== 'ok') { toast(T('Данные Ресепшена ещё не загружены: от них считается процент сотрудников')); return; } mdoc(S.M).payroll = payCalc(staffEff(S), S.cfg.tax); saveMonth(S.M); toast(T('Зарплата за {m} начислена', { m: mName(S.M).toLowerCase() })); }
-  else if (act === 'unaccrue') { mdoc(S.M).payroll = null; saveMonth(S.M); }
+  else if (act === 'accrue') { if (isLocked(S.M)) { toast(T(LOCK_MSG)); return; } if (!S.cfg.staff.length) return; if (S.cfg.staff.some(function (s) { return s.pct > 0; }) && S.clinic.state !== 'ok') { toast(T('Данные Ресепшена ещё не загружены: от них считается процент сотрудников')); return; } mdoc(S.M).payroll = payCalc(staffEff(S), S.cfg.tax); saveMonth(S.M); toast(T('Зарплата за {m} начислена', { m: mName(S.M).toLowerCase() })); }
+  else if (act === 'unaccrue') { if (isLocked(S.M)) { toast(T(LOCK_MSG)); return; } mdoc(S.M).payroll = null; logAct({ k: 'unaccrue', d: S.M + '-01' }); saveMonth(S.M); }
   else if (act === 'add-staff') { var nid = uid(); S.cfg.staff.push({ id: nid, name: '', role: 'Медсестра', salary: 0 }); S.staffOpen = true; S.editStaff = nid; saveCfg(); }
   else if (act === 'add-asset') { S.cfg.assets.push({ id: uid(), name: '', cost: 0, date: today(), life: 60, acct: 'transfer' }); saveCfg(); }
   else if (act === 'sync-login') authAction('in');
@@ -364,7 +395,7 @@ document.addEventListener('input', function (ev) {
   var el = ev.target;
   if (el.dataset.kind === 'money') { var dg = el.value.replace(/\D/g, ''); el.value = dg ? Number(dg).toLocaleString('ru-RU') : ''; }
   if (el.dataset.kind === 'date') el.value = maskDate(el.value);
-  if (el.dataset.d) S.draft[el.dataset.d] = el.dataset.kind === 'date' ? parseDate(el.value) : el.value;
+  if (el.dataset.d) S.draft[el.dataset.d] = el.dataset.kind === 'date' ? parseDate(el.value) : el.type === 'checkbox' ? el.checked : el.value;
   if (el.dataset.info && S.info.s) S.info.s[el.dataset.info] = el.value;
   if (el.dataset.pp && S.pp.s) { if (el.dataset.pp === 'card_number') { var cd = el.value.replace(/\D/g, '').slice(0, 16); el.value = cd.replace(/(\d{4})(?=\d)/g, '$1 '); } S.pp.s[el.dataset.pp] = el.value; }
   if (el.dataset.psvc && S.pp.svc.length) {
@@ -390,7 +421,7 @@ document.addEventListener('change', function (ev) {
   if (el.dataset.days) { var dd = mdoc(S.M); dd.days = dd.days || {}; dd.days[el.dataset.days] = num(el.value); saveMonth(S.M); return; }
   if (el.dataset.info === 'map_url' && S.info.s) { var mc = mapCoords(el.value); if (mc) { S.info.s.lat = mc.lat.replace('.', ','); S.info.s.lng = mc.lng.replace('.', ','); render(); } return; }
   var p = el.dataset.bind; if (!p) return;
-  var k = el.dataset.kind, v = (k === 'money' || k === 'num') ? num(el.value) : el.value;
+  var k = el.dataset.kind, v = (k === 'money' || k === 'num') ? num(el.value) : el.type === 'checkbox' ? el.checked : el.value;
   if (k === 'date') {
     var iso = parseDate(el.value);
     if (el.value.trim() && !iso) { toast(T('Введите дату в формате дд.мм.гггг, год от 2000 до 2100')); render(); return; }
@@ -407,7 +438,9 @@ document.addEventListener('submit', function (ev) {
   var dr = S.draft, a = num(dr.amount); if (!a || a < 0) { toast(T('Введите сумму больше нуля')); return; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dr.date)) { toast(T('Укажите дату')); return; }
   if (!validDate(dr.date)) { toast(T('Проверьте год в дате')); return; }
-  var m = ymOf(dr.date); mdoc(m).ops.push({ id: uid(), d: dr.date, t: dr.type, c: dr.cat, a: a, acct: dr.acct, n: dr.note.trim() });
+  var m = ymOf(dr.date); if (isLocked(m)) { toast(T(LOCK_MSG)); return; }
+  var nop = { id: uid(), d: dr.date, t: dr.type, c: dr.cat, a: a, acct: dr.acct, n: dr.note.trim() }; if (dr.type === 'income' && dr.cat !== 'contrib') nop.chk = dr.chk !== false;
+  mdoc(m).ops.push(nop); logAct({ k: 'add', c: dr.cat, a: a, d: dr.date });
   dr.amount = ''; dr.note = ''; var moved = m !== S.M; S.M = m; saveMonth(m);
   toast(moved ? T('Добавлено. Открыт {m}', { m: mName(m).toLowerCase() }) : T('Добавлено'));
 });
