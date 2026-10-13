@@ -455,3 +455,10 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .seg.four{flex-wrap:wrap}.seg.four button{flex:1 1 28%}
 .srct th,.srct td{padding:5px 4px!important;font-size:11px!important}.srct th{white-space:nowrap}.srct td.lbl,.srct td:first-child{font-size:12px!important;min-width:110px}
 .fld .seg.four button{flex:1 1 30%}
+
+/* советы */
+.tips li{align-items:flex-start;gap:10px;justify-content:flex-start}
+.tips .tip-ic{flex:0 0 auto}
+.tips li>span:last-child{flex:1;min-width:0;line-height:1.4}
+.legal{margin-top:10px}
+.legal summary{cursor:pointer;font-weight:700;padding:8px 0;color:var(--accent)}
