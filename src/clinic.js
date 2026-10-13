@@ -56,3 +56,6 @@ export async function sourceStats(from, to) { const r = await sb.rpc('source_sta
 
 // Очистка данных клиники на сервере (только владелец): записи, клиенты, чеки, состояния бота
 export async function purgeData(what) { const r = await sb.functions.invoke('purge-data', { body: { what } }); if (r.error) { let m = r.error.message; try { const j = await r.error.context.json(); m = j.message || j.error || m; } catch (e) { /* без подробностей */ } throw new Error(m); } return r.data; }
+
+// Воронка записи на сайте: сколько клиентов дошло до каждого шага и где остановилось (только владелец)
+export async function funnelStats(from, to) { const r = await sb.rpc('funnel_stats', { p_from: from, p_to: to }); if (r.error) throw r.error; return r.data || {}; }

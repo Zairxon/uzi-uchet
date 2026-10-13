@@ -303,6 +303,24 @@ function srcLinksHtml(u) {
   return row('Ссылка на «Навбат»', l.web, 'src-web') + row('Ссылка на бота', l.bot, 'src-bot');
 }
 export { srcLinksHtml };
+// Воронка записи: сколько посетителей сайта дошло до каждого шага
+var FUN = [['open', 'Открыли сайт'], ['day', 'Выбрали день'], ['doctor', 'Выбрали врача'], ['time', 'Выбрали время'], ['service', 'Выбрали услугу'], ['form', 'Начали вводить имя и телефон'], ['book_click', 'Нажали «Записаться»'], ['held', 'Время удержано (ждём чек)'], ['pay_view', 'Открыли экран оплаты'], ['receipt_pick', 'Выбрали фото чека'], ['receipt_sent', 'Отправили чек']];
+var FUN_ERR = { bad_name: 'Не ввели имя', bad_phone: 'Неверный телефон', no_service: 'Не выбрали услугу', no_agree: 'Не подтвердили условия', slot_taken: 'Время уже занято', slot_unavailable: 'Время недоступно', net: 'Нет связи' };
+function funnelView(S) {
+  var f = S.src && S.src.fun; if (!f) return '';
+  var R = f.reached || {}, ST = f.stopped || {}, n = +f.sessions || 0;
+  var h = '<section><h2>' + t('Где клиенты останавливаются при записи') + '</h2><div class="panel">';
+  if (!n) return h + '<p class="empty">' + t('Пока нет данных: показатели появятся, когда клиенты начнут заходить на сайт.') + '</p></div></section>';
+  var done = (+R.receipt_sent || 0) + (+R.done || 0), top = 0;
+  h += '<p class="small muted">' + t('Посетителей сайта: {n}, завершили запись: {d}', { n: n, d: done }) + '</p><div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Шаг') + '</th><th class="r">' + t('Дошли') + '</th><th class="r">' + t('Остановились') + '</th></tr></thead><tbody>';
+  FUN.forEach(function (s) { var r = s[0] === 'receipt_sent' ? (+R.receipt_sent || 0) + (+R.done || 0) : (+R[s[0]] || 0); var st = s[0] === 'receipt_sent' ? (+ST.finished || 0) : (+ST[s[0]] || 0);
+    h += '<tr><td>' + t(s[1]) + '<div class="bar" style="width:' + Math.round(r / n * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + r + '</td><td class="r num">' + (st ? '<b>' + st + '</b>' : '–') + '</td></tr>'; });
+  h += '</tbody></table></div><p class="small muted">' + t('Для записи без предоплаты последний шаг — «Нажали «Записаться»» с успешным итогом.') + '</p>';
+  var er = Object.keys(f.errors || {}).sort(function (a, b) { return f.errors[b] - f.errors[a]; });
+  if (er.length) h += '<p class="small"><b>' + t('Чаще всего мешает:') + '</b> ' + er.map(function (k) { return esc(t(FUN_ERR[k] || 'Другая ошибка')) + ' — ' + f.errors[k]; }).join(', ') + '</p>';
+  var tr = (+R.tour_start || 0); if (tr) h += '<p class="small muted">' + t('Подсказка при первом входе: началась {a}, пропустили {b}, дошли до конца {c}', { a: tr, b: +R.tour_skip || 0, c: +R.tour_done || 0 }) + '</p>';
+  return h + '</div></section>';
+}
 function srcView(S) {
   var X = S.src || { state: 'idle', rows: [], msg: '', u: { source: 'instagram', custom: '', medium: 'bio', campaign: '' } }, u = X.u;
   var h = '<section><h2>' + t('Откуда клиенты за {m}', { m: lc(S.M) }) + '</h2>';
@@ -320,7 +338,7 @@ function srcView(S) {
       return '<tr><td>' + lbl(x) + '<div class="bar" style="width:' + Math.round(+x.visited / maxV * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + x.total + '</td><td class="r num"><b>' + x.visited + '</b></td><td class="r num">' + x.noshow + '</td><td class="r num">' + fmt(+x.revenue) + '</td></tr>';
     }).join('') + '</tbody><tfoot><tr><td><b>' + t('Итого') + '</b></td><td class="r num"><b>' + T.total + '</b></td><td class="r num"><b>' + T.visited + '</b></td><td class="r num"><b>' + T.noshow + '</b></td><td class="r num"><b>' + fmt(T.revenue) + '</b></td></tr></tfoot></table></div>';
   }
-  h += '</section><section><h2>' + t('Ссылки для рекламы') + '</h2><div class="panel"><p class="small muted">' + t('Выберите, где будет стоять ссылка. Приложение создаст адрес с меткой, и клиенты с него будут видны в таблице выше. Записи по звонку и из живой очереди отмечает ресепшен.') + '</p>' +
+  h += '</section>' + funnelView(S) + '<section><h2>' + t('Ссылки для рекламы') + '</h2><div class="panel"><p class="small muted">' + t('Выберите, где будет стоять ссылка. Приложение создаст адрес с меткой, и клиенты с него будут видны в таблице выше. Записи по звонку и из живой очереди отмечает ресепшен.') + '</p>' +
     '<div class="fld"><span>' + t('Где размещаем') + '</span><div class="seg four">' + SRC_SOURCES.map(function (s) { return '<button type="button" data-act="src-pick" data-id="' + s[0] + '" aria-pressed="' + (u.source === s[0]) + '">' + t(s[1]) + '</button>'; }).join('') + '</div></div>' +
     (u.source === 'other' ? '<div class="fld"><span>' + t('Своё название') + '</span><input type="text" data-src="custom" value="' + esc(u.custom) + '" autocomplete="off"></div>' : '') +
     '<div class="fld"><span>' + t('Формат') + '</span><div class="seg four">' + SRC_MEDIA.map(function (s) { return '<button type="button" data-act="src-medium" data-id="' + s[0] + '" aria-pressed="' + (u.medium === s[0]) + '">' + t(s[1]) + '</button>'; }).join('') + '</div></div>' +

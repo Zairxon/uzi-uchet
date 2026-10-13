@@ -169,6 +169,7 @@ function srcState() { if (!S.src) S.src = { state: 'idle', rows: [], msg: '', u:
 function loadSrc() {
   var X = srcState(); if (!sync.enabled || !S.sync.user) { X.state = 'idle'; render(); return Promise.resolve(); }
   X.state = 'loading'; render(); var r = clinic.monthRange(S.M);
+  clinic.funnelStats(r.from, r.to).then(function (f) { X.fun = f; }).catch(function () { X.fun = null; }).then(render);
   return clinic.sourceStats(r.from, r.to).then(function (rows) { X.rows = rows; X.state = 'ok'; }).catch(function (e) { X.state = 'error'; X.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
 }
 
