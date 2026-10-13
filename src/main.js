@@ -156,8 +156,20 @@ function openTab(id) {
   if (id === 'home') { if (cur.tab) history.back(); } else if (cur.tab) history.replaceState({ tab: id }, ''); else history.pushState({ tab: id }, '');
   if (id === 'pay') loadClinic(); if (id === 'set' && S.info.state !== 'ok') loadInfo();
   if (id === 'ops') dayRcLoad(); if (id === 'ops' || id === 'home') { rcSync(S.M); rcSync(ymOf(today())); }
+  if (id === 'home') loadMissing();
 }
 
+/* ---------- журнал Ресепшена и чеки ---------- */
+function loadAudit() {
+  var A = S.audit || (S.audit = { state: 'idle', rows: [], msg: '' }); if (!sync.enabled || !S.sync.user) { A.state = 'idle'; render(); return Promise.resolve(); }
+  A.state = 'loading'; render();
+  return clinic.auditList(60).then(function (rows) { A.rows = rows; A.state = 'ok'; }).catch(function (e) { A.state = 'error'; A.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
+}
+function loadMissing() {
+  if (!sync.enabled || !S.sync.user) return;
+  var rg = clinic.monthRange(S.M);
+  clinic.missingChecks(rg.from, rg.to).then(function (x) { S.missing = x; render(); }).catch(function () { S.missing = null; });
+}
 /* ---------- очистка данных ---------- */
 var WIPE_NAME = { appointments: 'Записи и приёмы', clients: 'Клиенты', receipts: 'Фото чеков', bot: 'Состояния бота', ops: 'Операции и зарплата', loan: 'Кредит и аренда', assets: 'Техника и оборудование', staff: 'Сотрудники клиники' };
 var WIPE_SERVER = ['appointments', 'clients', 'receipts', 'bot'];
@@ -367,6 +379,7 @@ document.addEventListener('click', function (ev) {
   else if (act === 'ops-next') { S.opsDay = addDays(S.opsDay, 1); dayRcLoad(); }
   else if (act === 'ops-today') { S.opsDay = today(); dayRcLoad(); }
   else if (act === 'lock-toggle') { var was = isLocked(S.M); S.cfg.locked = S.cfg.locked || {}; if (was) delete S.cfg.locked[S.M]; else S.cfg.locked[S.M] = true; logAct({ k: was ? 'unlock' : 'lock', d: S.M + '-01' }); render(); toast(T(was ? 'Месяц открыт' : 'Месяц закрыт: записи за него менять нельзя')); }
+  else if (act === 'audit-load') loadAudit();
   else if (act === 'export-ops') exportOps();
   else if (act === 'export-year') exportYear();
   else if (act === 'print') window.print();

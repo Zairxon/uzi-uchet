@@ -89,6 +89,7 @@ function tipsView(S, C) {
     if (r.int / r.rev > 0.1) add('warn', t('Проценты по кредиту — {p}% выручки месяца. Если нагрузка растёт, обсудите с банком график или досрочное погашение.', { p: pc(r.int / r.rev) }));
     if (r.opex.ads && r.opex.ads / r.rev > 0.15) add('warn', t('На рекламу ушло {p}% выручки. Сверьте с отчётом «Откуда клиенты»: какие источники реально приводят людей.', { p: pc(r.opex.ads / r.rev) }));
   }
+  if (S.missing && S.missing.n > 0) add('bad', t('В «Ресепшене» за этот месяц {n} оплат ({s} сум) без номера фискального чека. Укажите номера чеков в окне оплаты.', { n: S.missing.n, s: fmt(S.missing.sum) }));
   var noChk = 0, noChkSum = 0; (((S.months[S.M] || {}).ops) || []).forEach(function (o) { if (o.t === 'income' && o.c !== 'contrib' && o.chk === false) { noChk++; noChkSum += o.a || 0; } });
   if (noChk) add('bad', t('В этом месяце {n} поступлений без чека на {s} сум. Каждую оплату нужно оформлять фискальным чеком.', { n: noChk, s: fmt(noChkSum) }));
   if (S.pp && S.pp.s && S.pp.s.card_number && !cfg.cardFirm) add('bad', t('Предоплата принимается на карту, которая не отмечена как карта фирмы. Уточните, на кого она оформлена: деньги на личной карте могут считаться неучтённым доходом.'));
@@ -580,7 +581,18 @@ export function vSet(S) {
     var when = ''; try { when = new Date(e.ts).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (x) { /* без времени */ }
     return '<li><div class="li-main"><b>' + t(LOGK[e.k] || e.k) + (e.c && CATNAME[e.c] ? ': ' + t(CATNAME[e.c]) : '') + '</b><span class="small muted">' + esc(when) + (e.who ? ' · ' + esc(e.who) : '') + (e.d ? ' · ' + esc(fmtDate(e.d)) : '') + '</span></div>' + (e.a ? '<span class="num">' + fmt(e.a) + '</span>' : '') + '</li>';
   }).join('') + '</ul>' : '<p class="empty">' + t('Пока записей нет. Здесь видно, кто и когда добавил или удалил операцию и закрыл месяц.') + '</p>') + '</div></section>';
-  var dataHtml = syncBlock(S) + appsBlock() + logHtml + wipeHtml +
+  var AU = S.audit || { state: 'idle', rows: [], msg: '' };
+  var AUC = { status: 'статус', amount: 'сумма', pay_method: 'способ оплаты', pay_status: 'состояние оплаты', deposit: 'предоплата', refund_amount: 'возврат', finished_at: 'завершён', room_at: 'у врача', starts_at: 'время', doctor_id: 'врач', client_name: 'имя', client_phone: 'телефон', check_no: 'номер чека' };
+  var AUS = { booked: 'Записан', came: 'Пришёл', done: 'Оплачено', cancelled: 'Отменён', no_show: 'Не пришёл', blocked: 'Время закрыто' };
+  var auv = function (k, x) { if (x == null || x === '') return '—'; if (k === 'status') return t(AUS[x] || x); if (k === 'finished_at' || k === 'room_at') return t('да'); if (k === 'starts_at') { try { return new Date(x).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(x); } } if (k === 'doctor_id') return t('другой врач'); return esc(String(x)); };
+  var auHtml = '<section><h2>' + t('Журнал Ресепшена') + '</h2><div class="panel"><p class="small muted">' + t('Кто и что менял в записях: статусы, оплаты, возвраты, переносы, удаления. Виден только владельцу.') + '</p>' +
+    (AU.state === 'ok' ? (AU.rows.length ? '<ul class="list">' + AU.rows.map(function (e) {
+      var when = ''; try { when = new Date(e.at).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (x) { /* без времени */ }
+      var what = e.act === 'insert' ? t('Создана запись') : e.act === 'delete' ? t('Удалена запись') : Object.keys(e.changes || {}).map(function (k) { var p = e.changes[k]; return t(AUC[k] || k) + ': ' + auv(k, p[0]) + ' → ' + auv(k, p[1]); }).join('; ');
+      return '<li><div class="li-main"><b>' + esc(e.client || '—') + '</b><span class="small muted">' + esc(when) + ' · ' + esc(e.who || '') + '</span><span class="small">' + what + '</span></div></li>';
+    }).join('') + '</ul>' : '<p class="empty">' + t('Изменений пока нет.') + '</p>') : AU.state === 'loading' ? '<p class="empty">' + t('Загрузка…') + '</p>' : AU.state === 'error' ? '<p class="alert">' + esc(AU.msg) + '</p>' : '') +
+    '<div class="row gaptop"><button type="button" class="btn ghost" data-act="audit-load">' + t(AU.state === 'ok' ? 'Обновить' : 'Показать журнал') + '</button></div></div></section>';
+  var dataHtml = syncBlock(S) + appsBlock() + logHtml + auHtml + wipeHtml +
     '<section><h2>' + t('Резервная копия') + '</h2><div class="panel">' +
     '<div class="row"><button class="btn" data-act="backup-save">' + t('Скачать резервную копию') + '</button><button class="btn ghost" data-act="backup-load">' + t('Загрузить из копии') + '</button></div>' +
     '<input id="backup-file" type="file" accept="application/json,.json" hidden></div>' +

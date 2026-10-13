@@ -59,3 +59,7 @@ export async function purgeData(what) { const r = await sb.functions.invoke('pur
 
 // Воронка записи на сайте: сколько клиентов дошло до каждого шага и где остановилось (только владелец)
 export async function funnelStats(from, to) { const r = await sb.rpc('funnel_stats', { p_from: from, p_to: to }); if (r.error) throw r.error; return r.data || {}; }
+
+// Журнал изменений записей «Ресепшена» и оплаты без номера фискального чека (только владелец)
+export async function auditList(n) { const r = await sb.rpc('audit_list', { p_limit: n || 60 }); if (r.error) throw r.error; return r.data || []; }
+export async function missingChecks(from, to) { const r = await sb.rpc('missing_checks', { p_from: from, p_to: to }); if (r.error) throw r.error; return r.data || { n: 0, sum: 0 }; }
