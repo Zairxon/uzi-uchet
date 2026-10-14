@@ -164,6 +164,7 @@ function openTab(id) {
   S.tab = id; render(); window.scrollTo(0, 0);
   var cur = history.state || {};
   if (id === 'home') { if (cur.tab) history.back(); } else if (cur.tab) history.replaceState({ tab: id }, ''); else history.pushState({ tab: id }, '');
+  if (id === 'rep' && S.repView === 'src') loadSrc();
   if (id === 'pay') loadClinic(); if (id === 'set' && S.info.state !== 'ok') loadInfo();
   if (id === 'ops') dayRcLoad(); if (id === 'ops' || id === 'home') { rcSync(S.M); rcSync(ymOf(today())); }
   if (id === 'home') loadMissing();
@@ -224,12 +225,15 @@ function utmAdd() {
 }
 /* ---------- источники клиентов ---------- */
 function srcState() { if (!S.src) S.src = { state: 'idle', rows: [], msg: '' }; return S.src; }
-function loadSrc() {
+// Отчёт «Источники»: три запроса идут одновременно; результат на ту же дату держим минуту, чтобы повторный вход в раздел открывался сразу
+function loadSrc(force) {
   var X = srcState(); if (!sync.enabled || !S.sync.user) { X.state = 'idle'; render(); return Promise.resolve(); }
-  X.state = 'loading'; render(); var r = clinic.monthRange(S.M);
-  clinic.funnelStats(r.from, r.to).then(function (f) { X.fun = f; }).catch(function () { X.fun = null; }).then(render);
-  clinic.utmVisits(r.from, r.to).then(function (f) { X.vis = f; }).catch(function () { X.vis = null; }).then(render);
-  return clinic.sourceStats(r.from, r.to).then(function (rows) { X.rows = rows; X.state = 'ok'; }).catch(function (e) { X.state = 'error'; X.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
+  if (!force && X.state === 'ok' && X.key === S.M && Date.now() - (X.at || 0) < 60000) { render(); return Promise.resolve(); }
+  if (X.busy === S.M) return Promise.resolve();
+  X.busy = S.M; X.state = 'loading'; render(); var r = clinic.monthRange(S.M), key = S.M;
+  var p1 = clinic.funnelStats(r.from, r.to).then(function (f) { if (key === S.M) { X.fun = f; render(); } }).catch(function () { X.fun = null; });
+  var p2 = clinic.utmVisits(r.from, r.to).then(function (f) { if (key === S.M) { X.vis = f; render(); } }).catch(function () { X.vis = null; });
+  return clinic.sourceStats(r.from, r.to).then(function (rows) { if (key === S.M) { X.rows = rows; X.state = 'ok'; X.key = key; X.at = Date.now(); } }).catch(function (e) { if (key === S.M) { X.state = 'error'; X.msg = e && e.message ? e.message : String(e); } }).then(function () { X.busy = ''; render(); return Promise.all([p1, p2]); });
 }
 
 /* ---------- поступления из «Ресепшена» в учёт ---------- */
@@ -395,8 +399,8 @@ document.addEventListener('click', function (ev) {
   else if (act === 'lang-menu') { var lm = document.getElementById('langmenu'); lm.hidden = !lm.hidden; }
   else if (act === 'theme-flip') { var nx = effDark() ? 'light' : 'dark'; try { localStorage.setItem('uzi-theme', nx); } catch (e) { /* не страшно */ } applyTheme(nx); render(); }
   else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
-  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); rcSync(S.M); }
-  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); rcSync(S.M); }
+  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(true); rcSync(S.M); }
+  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(true); rcSync(S.M); }
   else if (act === 'tab') openTab(id);
   else if (act === 'ops-prev') { S.opsDay = addDays(S.opsDay, -1); dayRcLoad(); }
   else if (act === 'ops-next') { S.opsDay = addDays(S.opsDay, 1); dayRcLoad(); }
@@ -499,9 +503,9 @@ registerSW({ immediate: true });
     sync.onAuth(function (u) {
       var was = S.sync.user && S.sync.user.id;
       S.sync.user = u; if (!u) S.info.state = 'idle'; render(); if (u && S.tab === 'set') loadInfo();
-      if (u && (!was || was !== u.id)) { doSync(false); if (S.tab === 'pay') loadClinic(); rcSync(ymOf(today())); }
+      if (u && (!was || was !== u.id)) { doSync(false); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); rcSync(ymOf(today())); }
     });
-    if (S.sync.user) { doSync(false); if (S.tab === 'pay') loadClinic(); if (S.tab === 'set') loadInfo(); rcSync(ymOf(today())); } else render();
+    if (S.sync.user) { doSync(false); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'set') loadInfo(); rcSync(ymOf(today())); } else render();
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - (S.sync.at || 0) > SYNC_EVERY) doSync(false); });
     window.addEventListener('online', function () { doSync(false); });
     setInterval(function () { if (document.visibilityState === 'visible' && navigator.onLine) doSync(false); }, SYNC_EVERY);
