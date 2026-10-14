@@ -169,14 +169,14 @@ function opRow(S, o, canDel) {
 var METHNAME = { cash: 'наличные', card: 'карта', transfer: 'перечисление' };
 // Пациенты из «Ресепшена» за выбранный день
 function rcBlock(S, day) {
-  var R = S.dayRc, h = '<div class="rcbox"><h3>🏥 ' + t('Из «Ресепшена»: пациенты дня') + '</h3>';
-  if (!S.sync.enabled || !S.sync.user) return h + '<p class="small muted">' + t('Войдите в «Настройки → Данные» (синхронизация), чтобы видеть пациентов из «Ресепшена».') + '</p></div>';
-  if (R.state === 'loading' || R.state === 'idle') return h + '<p class="small muted">' + t('Загрузка…') + '</p></div>';
-  if (R.state === 'error') return h + '<p class="small muted">' + t('Не удалось получить данные клиники: {m}', { m: esc(R.msg) }) + '</p></div>';
-  if (!R.rows.length) return h + '<p class="small muted">' + t('В этот день оплат из «Ресепшена» не было.') + '</p></div>';
+  var R = S.dayRc, h = '<h2>' + t('Из «Ресепшена»: пациенты дня') + '</h2>';
+  if (!S.sync.enabled || !S.sync.user) return h + '<p class="small muted">' + t('Войдите в «Настройки → Данные» (синхронизация), чтобы видеть пациентов из «Ресепшена».') + '</p>';
+  if (R.state === 'loading' || R.state === 'idle') return h + '<p class="empty">' + t('Загрузка…') + '</p>';
+  if (R.state === 'error') return h + '<p class="small muted">' + t('Не удалось получить данные клиники: {m}', { m: esc(R.msg) }) + '</p>';
+  if (!R.rows.length) return h + '<p class="empty">' + t('В этот день оплат из «Ресепшена» не было.') + '</p>';
   var sum = 0, vis = 0;
   R.rows.forEach(function (x) { var a = x.kind === 'refund' ? -x.amount : +x.amount; sum += a; if (x.kind === 'visit') vis++; });
-  h += '<div class="scroll"><table class="rct grid"><thead><tr><th>' + t('Время') + '</th><th>' + t('Пациент') + '</th><th>' + t('Врач / услуга') + '</th><th class="r">' + t('Оплата') + ' / ' + t('Сумма') + '</th></tr></thead><tbody>' + R.rows.map(function (x) {
+  h += '<div class="panel"><div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Время') + '</th><th>' + t('Пациент') + '</th><th>' + t('Врач / услуга') + '</th><th class="r">' + t('Оплата') + ' / ' + t('Сумма') + '</th></tr></thead><tbody>' + R.rows.map(function (x) {
     var ref = x.kind === 'refund', a = ref ? -x.amount : +x.amount, how = ref ? '↩ ' + t('возврат') + ' · ' + t(METHNAME[x.method] || 'наличные') : x.kind === 'deposit' ? '💳 ' + t('предоплата') : t(METHNAME[x.method] || 'наличные');
     return '<tr' + (ref ? ' class="rrefund"' : '') + '><td class="num">' + esc(x.at) + '</td><td><b>' + esc(x.client_name || '—') + '</b>' + (x.finished ? '<br><span class="small muted">✔ ' + t('прошёл') + '</span>' : '') + '</td><td>' + esc(x.doctor_name || '') + (x.service ? '<br><span class="small muted">' + esc(x.service) + '</span>' : '') + '</td><td class="r"><span class="num ' + (a < 0 ? 'neg' : 'pos') + '"><b>' + (a < 0 ? '−' : '+') + fmt(Math.abs(a)) + '</b></span><br><span class="small muted">' + how + '</span></td></tr>';
   }).join('') + '</tbody><tfoot><tr><td colspan="3"><b>' + t('Пациентов: {n}', { n: vis }) + '</b></td><td class="r num"><b>' + fmt(sum) + '</b></td></tr></tfoot></table></div></div>';
@@ -204,7 +204,7 @@ export function vOps(S) {
   h += '<section class="opsday"><h2>' + t('Операции за день') + '</h2>' +
     '<div class="daynav2"><button type="button" class="navbtn" data-act="ops-prev" aria-label="' + esc(t('Предыдущий день')) + '">‹</button><button type="button" class="daylabel2" data-act="ops-today">' + (isToday ? t('Сегодня') + ' · ' : '') + esc(fmtDate(day)) + '</button><button type="button" class="navbtn" data-act="ops-next" aria-label="' + esc(t('Следующий день')) + '">›</button></div>' +
     kpi3(f) + rcBlock(S, day) +
-    '<h3 class="subh">' + t('Остальные операции дня') + '</h3>' + (dops.length ? '<ul class="list">' + dops.map(function (o) { return opRow(S, o, !(S.cfg.locked && S.cfg.locked[o.d.slice(0, 7)])); }).join('') + '</ul>' : '<p class="empty">' + t('Других операций в этот день нет.') + '</p>') + '</section>';
+    '<h2>' + t('Остальные операции дня') + '</h2>' + (dops.length ? '<ul class="list">' + dops.map(function (o) { return opRow(S, o, !(S.cfg.locked && S.cfg.locked[o.d.slice(0, 7)])); }).join('') + '</ul>' : '<p class="empty">' + t('Других операций в этот день нет.') + '</p>') + '</section>';
   // месяц
   var mops = ((months_[M] && months_[M].ops) || []).slice().sort(sorter), mi = 0, me = 0;
   mops.forEach(function (o) { if (o.t === 'income') { if (o.c !== 'contrib') mi += o.a || 0; } else me += o.a || 0; });

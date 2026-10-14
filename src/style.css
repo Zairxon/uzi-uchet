@@ -485,3 +485,6 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
 .utmcard .uh{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
 
+
+/* операции за день и месяц: без общей рамки, как остальные разделы */
+.opsday,.opsmonth{padding:0;border:0;background:transparent;border-radius:0}
