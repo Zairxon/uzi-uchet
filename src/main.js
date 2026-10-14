@@ -214,7 +214,6 @@ function wipe(id) {
 }
 
 /* ---------- метки (УТМ) ---------- */
-var UTM_PRE = [['Инстаграм', 'social'], ['Телеграм', 'social'], ['Фейсбук', 'social'], ['Ютуб', 'social'], ['Тикток', 'social'], ['Гугл', 'site'], ['Яндекс', 'site'], ['2ГИС', 'site']];
 function utmDraft() { if (!S.utmD) S.utmD = { name: '', type: 'social', note: '' }; return S.utmD; }
 function utmAdd() {
   var d = utmDraft(), name = (d.name || '').trim(); if (name.length < 2) { toast(T('Введите название метки')); return; }
@@ -388,7 +387,7 @@ document.addEventListener('click', function (ev) {
   S.armed = null;
   if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); if (id === 'src' || id === 'utm') loadSrc(); }
   else if (act === 'utm-type') { utmDraft().type = id; render(); }
-  else if (act === 'utm-preset') { var pr = UTM_PRE[+id]; if (pr) { var dd = utmDraft(); dd.name = pr[0]; dd.type = pr[1]; render(); } }
+  else if (act === 'utm-copy') { var uu = b.dataset.url || ''; try { navigator.clipboard.writeText(uu); } catch (e) { var tmp = document.createElement('input'); tmp.value = uu; document.body.appendChild(tmp); tmp.select(); document.execCommand('copy'); tmp.remove(); } var old = b.textContent; b.textContent = T('Скопировано'); setTimeout(function () { b.textContent = old; }, 1500); }
   else if (act === 'utm-add') utmAdd();
   else if (act === 'src-copy') { var inp = document.getElementById(id); if (inp) { inp.select(); try { navigator.clipboard.writeText(inp.value); } catch (e) { document.execCommand('copy'); } b.textContent = T('Скопировано'); } }
   else if (act === 'lang-set') { setLang(id); document.getElementById('langmenu').hidden = true; render(); }
