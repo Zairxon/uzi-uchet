@@ -518,9 +518,9 @@ export function vRep(S, C) {
     tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div></section>';
   var balN = '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p>';
   // один отчёт на экране: таблицы на всю ширину, переключатель сверху
-  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), src: srcView(S) + utmView(S) + funnelView(S), cmp: cfg.tax.regime === 'general' ? genH : cmpH + cmpRest };
-  var rv = blocks[S.repView] ? S.repView : S.repView === 'utm' ? 'src' : 'pl';
-  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['src', 'Источники и метки'], ['cmp', 'Налоги']].map(function (x) {
+  var blocks = { pl: plH + cashH + cashN, bal: balH + balN, loan: loanRep(S, C), src: srcView(S) + utmView(S) + funnelView(S), cmp: cfg.tax.regime === 'general' ? genH : cmpH + cmpRest };
+  var rv = blocks[S.repView] ? S.repView : S.repView === 'utm' ? 'src' : 'pl'; // старые вкладки «Деньги» и «Метки» ведут в объединённые
+  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль и деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['src', 'Источники и метки'], ['cmp', 'Налоги']].map(function (x) {
     return '<button type="button" role="tab" data-act="rep-view" data-id="' + x[0] + '" aria-pressed="' + (rv === x[0]) + '">' + t(x[1]) + '</button>';
   }).join('') + '</div>';
   var tools = '<div class="row repTools"><button type="button" class="btn ghost" data-act="export-year">' + t('Скачать отчёт за год') + '</button><button type="button" class="btn ghost" data-act="print">' + t('Печать') + '</button></div>';
