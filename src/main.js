@@ -414,7 +414,7 @@ document.addEventListener('click', function (ev) {
   else if (act === 'set-tab') { S.setTab = id; try { localStorage.setItem('uzi-settab', id); } catch (e) { /* не страшно */ } render(); window.scrollTo(0, 0); }
   else if (act === 'info-save') saveInfo();
   else if (act === 'pp-save') savePrepay();
-  else if (act === 'pp-add') { S.pp.svc.push({ id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : uid() + uid() + uid(), name_ru: '', name_uz: '', price: 0, percent: 30, fixed: '', active: true, sort: S.pp.svc.length + 1 }); render(); }
+  else if (act === 'pp-add') { S.pp.svc.push({ id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : uid() + uid() + uid(), name_ru: '', name_uz: '', price: 0, percent: 30, fixed: '', active: true, sort: S.pp.svc.length + 1, isNew: true }); render(); }
   else if (act === 'pp-del') { var dx = S.pp.svc.splice(+id, 1)[0]; if (dx) S.pp.removed.push(dx.id); render(); }
   else if (act === 'loan-toggle') { S.loanOpen = !S.loanOpen; render(); }
   else if (act === 'accrue') { if (isLocked(S.M)) { toast(T(LOCK_MSG)); return; } if (!S.cfg.staff.length) return; if (S.cfg.staff.some(function (s) { return s.pct > 0; }) && S.clinic.state !== 'ok') { toast(T('Данные Ресепшена ещё не загружены: от них считается процент сотрудников')); return; } mdoc(S.M).payroll = payCalc(staffEff(S), S.cfg.tax); saveMonth(S.M); toast(T('Зарплата за {m} начислена', { m: mName(S.M).toLowerCase() })); }
