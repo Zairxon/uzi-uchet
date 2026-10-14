@@ -1,6 +1,5 @@
 // Шесть вкладок. Разметка перенесена из прототипа без изменений; тексты идут через t() (русский / узбекский).
 // Состояние приходит в объекте S: { cfg, months, M, draft, armed, sync }.
-import { qrStyled } from './qrstyle.js';
 import { sched, payCalc, blank, ytd, compareTax, generalTax, compute } from './calc.js';
 import { addM, mName, ymOf, fmt, fmtM, esc, today } from './util.js';
 import { t, months, getLang } from './i18n.js';
@@ -369,7 +368,6 @@ export function vLoan(S) {
 // Источники клиентов: таблица за месяц и создание рекламных ссылок с меткой
 var SRC_SOURCES = [['instagram', 'Инстаграм'], ['telegram', 'Телеграм'], ['facebook', 'Фейсбук'], ['google', 'Гугл'], ['yandex', 'Яндекс'], ['2gis', '2ГИС'], ['flyer', 'Листовка'], ['barcode', 'Штрих-код'], ['other', 'Другое']];
 export function srcSlug(s) { return cyr2lat(String(s || '')).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40); }
-function qrDataUrl(text) { return qrStyled(text, 1200); }
 // «УТМ-отдел»: свои метки. Приложение само создаёт ссылку и QR-код, считает записи и выручку по каждой метке.
 var UTM_TYPES = [['social', 'Соцсеть'], ['site', 'Сайт'], ['person', 'Человек'], ['print', 'Листовка или QR'], ['other', 'Другое']];
 var UTM_PRESETS = [['Инстаграм', 'social'], ['Телеграм', 'social'], ['Фейсбук', 'social'], ['Ютуб', 'social'], ['Тикток', 'social'], ['Гугл', 'site'], ['Яндекс', 'site'], ['2ГИС', 'site']];
@@ -386,7 +384,7 @@ function utmView(S) {
     return '<p class="small">' + t('За {m}: записей {a}, пришли {b}, выручка {c} сум', { m: lc(S.M), a: s.total, b: s.visited, c: fmt(s.revenue) }) + '</p>';
   };
   var row = function (label, url, id) { return '<div class="fld"><span>' + t(label) + '</span><div class="row"><input type="text" readonly value="' + esc(url) + '" id="' + id + '" style="font-size:12px"><button type="button" class="btn ghost" data-act="src-copy" data-id="' + id + '">' + t('Копировать') + '</button></div></div>'; };
-  var h = '<section><h2>' + t('Метки (УТМ)') + '</h2><p class="small muted">' + t('Создайте метку для каждого места или человека, где будет стоять ваша ссылка: страница в соцсети, сайт, блогер, листовка. Приложение само сделает ссылку и QR-код, а когда клиенты запишутся по ним, здесь будет видно, сколько записей и денег принесла каждая метка.') + '</p></section>';
+  var h = '<section><h2>' + t('Метки (УТМ)') + '</h2><p class="small muted">' + t('Создайте метку для каждого места или человека, где будет стоять ваша ссылка: страница в соцсети, сайт, блогер, листовка. Приложение само сделает ссылку (Кю-Ар код для печати можно сделать из неё в любом сервисе), а здесь будет видно, сколько раз по ней входили, сколько записалось и сколько денег принесла каждая метка.') + '</p></section>';
   h += '<section><h2>' + t('Новая метка') + '</h2><div class="panel">' +
     '<div class="fld"><span>' + t('Быстро выбрать') + '</span><div class="pills">' + UTM_PRESETS.map(function (p, k) { return '<button type="button" class="pill" data-act="utm-preset" data-id="' + k + '">' + t(p[0]) + '</button>'; }).join('') + '</div></div>' +
     '<label class="fld"><span>' + t('Название метки') + '</span><input type="text" data-utm="name" value="' + esc(D.name) + '" autocomplete="off" placeholder="' + esc(t('например: Мадина Каримова или Инстаграм клиники')) + '"></label>' +
@@ -394,19 +392,33 @@ function utmView(S) {
     '<label class="fld"><span>' + t('Заметка (необязательно)') + '</span><input type="text" data-utm="note" value="' + esc(D.note) + '" autocomplete="off" placeholder="' + esc(t('например: ссылка на страницу, телефон человека')) + '"></label>' +
     '<div class="row gaptop"><button type="button" class="btn" data-act="utm-add">' + t('Создать метку') + '</button></div></div></section>';
   h += '<section><h2>' + t('Мои метки') + ' <span class="chip">' + list.length + '</span></h2>';
-  if (!list.length) h += '<p class="empty">' + t('Меток пока нет. Создайте первую выше: ссылка и QR-код появятся здесь.') + '</p>';
+  if (!list.length) h += '<p class="empty">' + t('Меток пока нет. Создайте первую выше: ссылка появится здесь.') + '</p>';
   list.forEach(function (l) {
-    var lk = utmLinks(l), open = S.utmQr === l.id;
+    var lk = utmLinks(l);
     h += '<div class="panel utmcard"><div class="uh"><div class="li-main"><b>' + esc(l.name) + '</b><span class="small muted"><span class="chip">' + typeName(l.type) + '</span> · ' + esc(l.slug) + (l.note ? ' · ' + esc(l.note) : '') + '</span></div>' + delBtn(S, 'del-utm', l.id) + '</div>' + stat(l) +
       row('Ссылка на «Навбат»', lk.web, 'utm-web-' + l.id) + row('Ссылка на бота', lk.bot, 'utm-bot-' + l.id) +
-      '<div class="row"><button type="button" class="btn ghost" data-act="utm-qr" data-id="' + esc(l.id) + '" aria-expanded="' + open + '">' + t(open ? 'Скрыть QR-коды' : 'Показать QR-коды') + '</button></div>' +
-      (open ? qrBlock('QR-код для «Навбата»', lk.web, 'navbat-' + l.slug) + qrBlock('QR-код для бота', lk.bot, 'bot-' + l.slug) : '') + '</div>';
+      visitsOf(S, l) + '</div>';
   });
-  return h + '</section>';
+  return h + recentVisits(S) + '</section>';
 }
-function qrBlock(label, url, name) {
-  var d = qrDataUrl(url); if (!d) return '';
-  return '<div class="qrbox"><img src="' + d + '" alt="QR" width="168" height="168"><div class="qrside"><b>' + t(label) + '</b><span class="small muted">' + t('Наведите камеру телефона: откроется ссылка с меткой.') + '</span><a class="btn" download="' + esc(name) + '.png" href="' + d + '">' + t('Скачать QR (PNG)') + '</a></div></div>';
+// Входы по меткам: сколько раз открывали «Навбат» по ссылке метки и кто дошёл до записи
+function visitsOf(S, l) {
+  var X = S.src || {}, V = X.vis; if (!V) return '';
+  var a = (V.rows || []).filter(function (x) { return x.src === l.slug; }), n = 0, b = 0, last = '';
+  a.forEach(function (x) { n += +x.visits; b += +x.booked; if (!last || x.last > last) last = x.last; });
+  return '<p class="small"><b>' + t('Входов по ссылке: {n}', { n: n }) + '</b>' + (n ? ' · ' + t('записались: {b}', { b: b }) + ' · ' + t('последний вход: {d}', { d: fmtWhen(last) }) : ' · ' + t('пока никто не входил')) + '</p>';
+}
+function fmtWhen(iso) { var d = new Date(iso); if (isNaN(d)) return ''; var z = function (x) { return x < 10 ? '0' + x : x; }; return z(d.getDate()) + '.' + z(d.getMonth() + 1) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+var VIS_STEP = { 1: 'открыл сайт', 2: 'выбрал день', 3: 'выбрал врача', 4: 'выбрал время', 5: 'выбрал услугу', 6: 'вводил данные', 7: 'нажал «Записаться»', 8: 'ждёт оплату', 9: 'экран оплаты', 10: 'выбрал чек', 11: 'записался' };
+function recentVisits(S) {
+  var V = S.src && S.src.vis; if (!V) return '';
+  var mine = {}; (S.cfg.utm || []).forEach(function (l) { mine[l.slug] = l; });
+  var h = '<h2>' + t('Кто входил по ссылкам') + '</h2>';
+  if (!(V.recent || []).length) return h + '<p class="empty">' + t('Пока никто не входил по ссылкам меток: список появится, когда клиенты начнут открывать «Навбат» по ним.') + '</p>';
+  return h + '<div class="panel"><div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Когда') + '</th><th>' + t('Метка') + '</th><th>' + t('Что сделал') + '</th></tr></thead><tbody>' + V.recent.map(function (x) {
+    var nm = mine[x.src] ? mine[x.src].name : x.src + (x.camp ? ' · ' + x.camp : '');
+    return '<tr><td class="num">' + fmtWhen(x.at) + '</td><td>' + esc(nm) + '</td><td>' + (x.booked ? '<span class="chip ok">' + t('записался') + '</span>' : t(VIS_STEP[x.top] || 'открыл сайт')) + '</td></tr>';
+  }).join('') + '</tbody></table></div><p class="small muted">' + t('Имена и телефоны здесь не показываются: видно только время, метку и до какого шага дошёл человек.') + '</p></div>';
 }
 // Воронка записи: сколько посетителей сайта дошло до каждого шага
 var FUN = [['open', 'Открыли сайт'], ['day', 'Выбрали день'], ['doctor', 'Выбрали врача'], ['time', 'Выбрали время'], ['service', 'Выбрали услугу'], ['form', 'Начали вводить имя и телефон'], ['book_click', 'Нажали «Записаться»'], ['held', 'Время удержано (ждём чек)'], ['pay_view', 'Открыли экран оплаты'], ['receipt_pick', 'Выбрали фото чека'], ['receipt_sent', 'Отправили чек']];

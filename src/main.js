@@ -21,7 +21,6 @@ import * as clinic from './clinic.js';
 import { fmtPhoneInput, cleanPhone } from './phone.js';
 import { t as T, getLang, setLang, brand } from './i18n.js';
 import { mountFooter } from './footer.js';
-import { onLogoReady } from './qrstyle.js';
 import { parseDate, maskDate, openCal, closeCal, fmtDate } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
 import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff, utmSlug } from './views.js';
@@ -61,7 +60,6 @@ function setChrome() {
 }
 document.addEventListener('click', function (ev) { var m = document.getElementById('langmenu'); if (m && !m.hidden && !ev.target.closest('#langmenu') && !ev.target.closest('#langbtn')) m.hidden = true; });
 document.getElementById('hero').src = heroUrl;
-onLogoReady(function () { if (ready) render(); });
 
 /* ---------- storage ---------- */
 function fail(e) {
@@ -223,7 +221,7 @@ function utmAdd() {
   var base = utmSlug(name) || 'metka', slug = base, n = 2, list = S.cfg.utm || [];
   while (list.some(function (l) { return l.slug === slug; })) { slug = base.slice(0, 26) + n; n++; }
   list.unshift({ id: uid(), name: name, type: d.type || 'other', slug: slug, note: (d.note || '').trim(), created: today() });
-  S.cfg.utm = list; S.utmD = { name: '', type: d.type || 'social', note: '' }; S.utmQr = list[0].id; logAct({ k: 'utmadd', d: today() }); saveCfg(); toast(T('Метка создана: ссылка и QR-код готовы'));
+  S.cfg.utm = list; S.utmD = { name: '', type: d.type || 'social', note: '' }; logAct({ k: 'utmadd', d: today() }); saveCfg(); toast(T('Метка создана: ссылка готова'));
 }
 /* ---------- источники клиентов ---------- */
 function srcState() { if (!S.src) S.src = { state: 'idle', rows: [], msg: '' }; return S.src; }
@@ -231,6 +229,7 @@ function loadSrc() {
   var X = srcState(); if (!sync.enabled || !S.sync.user) { X.state = 'idle'; render(); return Promise.resolve(); }
   X.state = 'loading'; render(); var r = clinic.monthRange(S.M);
   clinic.funnelStats(r.from, r.to).then(function (f) { X.fun = f; }).catch(function () { X.fun = null; }).then(render);
+  clinic.utmVisits(r.from, r.to).then(function (f) { X.vis = f; }).catch(function () { X.vis = null; }).then(render);
   return clinic.sourceStats(r.from, r.to).then(function (rows) { X.rows = rows; X.state = 'ok'; }).catch(function (e) { X.state = 'error'; X.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
 }
 
@@ -390,7 +389,6 @@ document.addEventListener('click', function (ev) {
   if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); if (id === 'src' || id === 'utm') loadSrc(); }
   else if (act === 'utm-type') { utmDraft().type = id; render(); }
   else if (act === 'utm-preset') { var pr = UTM_PRE[+id]; if (pr) { var dd = utmDraft(); dd.name = pr[0]; dd.type = pr[1]; render(); } }
-  else if (act === 'utm-qr') { S.utmQr = S.utmQr === id ? '' : id; render(); }
   else if (act === 'utm-add') utmAdd();
   else if (act === 'src-copy') { var inp = document.getElementById(id); if (inp) { inp.select(); try { navigator.clipboard.writeText(inp.value); } catch (e) { document.execCommand('copy'); } b.textContent = T('Скопировано'); } }
   else if (act === 'lang-set') { setLang(id); document.getElementById('langmenu').hidden = true; render(); }
