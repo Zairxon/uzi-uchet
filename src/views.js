@@ -76,8 +76,7 @@ function tipsView(S, C) {
   var pc = function (x) { return Math.round(x * 100); };
   var exp = r.opexSum + r.payroll + r.rent + r.int + r.dep;
   var gen = cfg.tax.regime === 'general', G = gen ? generalTax(cfg, C.rows, S.M) : null;
-  if (!gen) add('bad', t('Для медицинской организации (юридического лица) налог с оборота недоступен (ст. 461 НК). Переключите режим на «Общий: НДС + налог на прибыль» в Настройки → Налоги.'));
-  if (S.taxSwitched) add('warn', t('Режим налогов переключён с налога с оборота на общий: по закону клиника платит НДС 12%, а налог на прибыль у неё 0% при доле медуслуг не менее 90%. Проверьте настройки и отметки «счёт-фактура» в расходах.'));
+  if (cfg.tax.regime === 'turnover' && Y.rev > 0) add('warn', t('По тексту Налогового кодекса организации, оказывающие медицинские услуги, не могут применять налог с оборота (ст. 461 ч.2 п.14, закон ЗРУ-1104 от 25.12.2025, действует и с 1 апреля 2025). Если налоговая переведёт клинику на общий режим, налогов за этот год было бы примерно на {n} сум больше (НДС 12% вместо 4%, без учёта входного НДС). Уточните в налоговой, как это применяется к вам.', { n: fmt(Math.max(0, Y.rev * 12 / 112 - Y.rev * cfg.tax.turnover / 100)) }));
   if (gen && G.ytd.rev > 0) {
     if (cfg.tax.social !== false && G.share < 0.9) add('bad', t('Доля доходов от медуслуг {p}% — меньше 90%. Тогда налог на прибыль 15% со всей прибыли года вместо 0%. Не записывайте как «Услуги УЗИ» то, что не относится к медуслугам, и держите прочие доходы ниже 10%.', { p: Math.round(G.share * 100) }));
     else if (cfg.tax.social !== false && G.share < 0.93) add('warn', t('Доля доходов от медуслуг {p}% — близко к границе 90% для нулевой ставки налога на прибыль.', { p: Math.round(G.share * 100) }));
@@ -120,6 +119,7 @@ function todoView(S) {
   [cur, nx].forEach(function (dm) {
     var per = addM(dm, -1), pay = (S.months[per] || {}).payroll, pr = rowOf(per), mo = +dm.slice(5, 7);
     items.push({ d: dm + '-15', title: t('Зарплатные налоги за {m}: НДФЛ, ИНПС, социальный налог (отчёт и оплата)', { m: lc(per) }), a: pay ? (pay.ndfl || 0) + (pay.inps || 0) + (pay.soc || 0) : 0, paid: paidIn(dm, ['pay_ptax']), pay: true });
+    if (cfg.tax.regime === 'turnover') items.push({ d: dm + '-15', title: t('Налог с оборота за {m}: расчёт и оплата', { m: lc(per) }), a: Math.max(0, pr ? pr.tax : 0), paid: paidIn(dm, ['pay_tax']), pay: true });
     if (gen) items.push({ d: dm + '-20', title: t('НДС за {m}: отчёт и оплата', { m: lc(per) }), a: Math.max(0, pr ? pr.vat : 0), paid: paidIn(dm, ['pay_vat']), pay: true });
     if ([1, 4, 7, 10].indexOf(mo) >= 0) items.push({ d: dm + '-20', title: t('Отчёт по налогу на прибыль за квартал (даже при ставке 0%)') });
     if (mo === 2) items.push({ d: dm + '-15', title: t('Годовой расчёт по социальному налогу') });
@@ -606,7 +606,7 @@ export function vSet(S) {
   var tab = S.setTab || 'clinic';
   var tabs = '<div class="seg four settabs" role="tablist">' + [['clinic', 'Клиника'], ['prepay', 'Предоплата'], ['tax', 'Налоги'], ['data', 'Данные']].map(function (x) { return '<button type="button" data-act="set-tab" data-id="' + x[0] + '" aria-pressed="' + (tab === x[0]) + '">' + t(x[1]) + '</button>'; }).join('') + '</div>';
   var taxHtml = '<section><h2>' + t('Налоговый режим') + '</h2><div class="panel"><label class="fld"><span>' + t('Как фирма платит налог') + '</span>' +
-    sel('f-tax-regime', [['general', 'Общий: НДС 12% + налог на прибыль (для клиники)'], ['turnover', 'Налог с оборота (для клиники недоступен)'], ['profit', 'Только налог на прибыль, без НДС']], tx.regime, 'data-bind="tax.regime" data-kind="text"') + '</label>' +
+    sel('f-tax-regime', [['general', 'Общий: НДС 12% + налог на прибыль (для клиники)'], ['turnover', 'Налог с оборота 4% (по ст. 461 для клиники недоступен, но так платят многие)'], ['profit', 'Только налог на прибыль, без НДС']], tx.regime, 'data-bind="tax.regime" data-kind="text"') + '</label>' +
     '<div class="grid">' + inp(S, t('НДС, %'), 'tax.vat', 'num') + inp(S, t('Налог с оборота, %'), 'tax.turnover', 'num') + inp(S, t('Налог на прибыль, %'), 'tax.profit', 'num') + inp(S, t('Перенос убытка, лет'), 'tax.lossYears', 'num') + inp(S, t('Убыток покрывает не более, % прибыли'), 'tax.lossLimit', 'num') + '</div><label class="chkrow"><input type="checkbox" data-bind="tax.social"' + (tx.social !== false ? ' checked' : '') + '><span>' + t('Медицинская организация в социальной сфере (не менее 90% дохода — медуслуги): налог на прибыль 0%') + '</span></label>' +
     '<p class="note">' + t('Налог на прибыль считается нарастающим итогом с начала года. Убыток прошлых лет по ст. 333 НК переносится без ограничения срока и доли, поэтому по умолчанию 100 лет и 100%.') + '</p></div></section>' +
     '<section><h2>' + t('Ставки с зарплаты') + '</h2><div class="panel"><div class="grid">' + inp(S, t('НДФЛ, %'), 'tax.ndfl', 'num') + inp(S, t('ИНПС, %'), 'tax.inps', 'num') + inp(S, t('Социальный налог, %'), 'tax.soc', 'num') + '</div></div>' +
