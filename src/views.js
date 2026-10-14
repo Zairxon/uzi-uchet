@@ -383,8 +383,8 @@ function utmView(S) {
     return '<p class="small">' + t('За {m}: записей {a}, пришли {b}, выручка {c} сум', { m: lc(S.M), a: s.total, b: s.visited, c: fmt(s.revenue) }) + '</p>';
   };
   var row = function (label, url, id) { return '<div class="fld"><span>' + t(label) + '</span><div class="row"><input type="text" readonly value="' + esc(url) + '" id="' + id + '" style="font-size:12px"><button type="button" class="btn ghost" data-act="src-copy" data-id="' + id + '">' + t('Копировать') + '</button></div></div>'; };
-  var h = '<section><h2>' + t('Метки (УТМ)') + '</h2><p class="small muted">' + t('Создайте метку для каждого места или человека, где будет стоять ваша ссылка: страница в соцсети, сайт, блогер, листовка. Приложение само сделает ссылку (Кю-Ар код для печати можно сделать из неё в любом сервисе), а здесь будет видно, сколько раз по ней входили, сколько записалось и сколько денег принесла каждая метка.') + '</p></section>';
-  h += '<section><h2>' + t('Новая метка') + '</h2><div class="panel">' +
+  var h = '';
+  if (S.utmOpen) h += '<section><h2>' + t('Новая метка') + '</h2><p class="small muted">' + t('Метка — ссылка для рекламы: по ней видно, сколько человек вошло, записалось и принесло денег. Кю-Ар код для печати сделайте из этой ссылки в любом сервисе.') + '</p><div class="panel">' +
     '<label class="fld"><span>' + t('Название метки') + '</span><input type="text" data-utm="name" value="' + esc(D.name) + '" autocomplete="off" placeholder="' + esc(t('например: Мадина Каримова или Инстаграм клиники')) + '"></label>' +
     '<div class="fld"><span>' + t('Что это') + '</span><div class="seg four">' + UTM_TYPES.map(function (x) { return '<button type="button" data-act="utm-type" data-id="' + x[0] + '" aria-pressed="' + (D.type === x[0]) + '">' + t(x[1]) + '</button>'; }).join('') + '</div></div>' +
     '<label class="fld"><span>' + t('Заметка (необязательно)') + '</span><input type="text" data-utm="note" value="' + esc(D.note) + '" autocomplete="off" placeholder="' + esc(t('например: ссылка на страницу, телефон человека')) + '"></label>' +
@@ -445,7 +445,7 @@ function srcView(S) {
       return '<tr><td>' + lbl(x) + '<div class="bar" style="width:' + Math.round(+x.visited / maxV * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + (+x.visits || '–') + '</td><td class="r num">' + x.total + '</td><td class="r num"><b>' + x.visited + '</b></td><td class="r num">' + x.noshow + '</td><td class="r num">' + fmt(+x.revenue) + '</td></tr>';
     }).join('') + '</tbody><tfoot><tr><td><b>' + t('Итого') + '</b></td><td class="r num"><b>' + T.vis + '</b></td><td class="r num"><b>' + T.total + '</b></td><td class="r num"><b>' + T.visited + '</b></td><td class="r num"><b>' + T.noshow + '</b></td><td class="r num"><b>' + fmt(T.revenue) + '</b></td></tr></tfoot></table></div>';
   }
-  return h + '</section>';
+  return h + '<div class="row gaptop"><button type="button" class="btn" data-act="utm-form">' + t(S.utmOpen ? 'Скрыть форму метки' : '＋ Добавить метку') + '</button></div></section>';
 }
 function loanRep(S, C) {
   var cfg = S.cfg, M = S.M, l = cfg.loan, B = C.B, started = !!(l.amount && ymOf(l.start) && ymOf(l.start) <= M), SC = sched(l, ymOf(l.start) || M), h = '';

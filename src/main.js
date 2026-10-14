@@ -220,7 +220,7 @@ function utmAdd() {
   var base = utmSlug(name) || 'metka', slug = base, n = 2, list = S.cfg.utm || [];
   while (list.some(function (l) { return l.slug === slug; })) { slug = base.slice(0, 26) + n; n++; }
   list.unshift({ id: uid(), name: name, type: d.type || 'other', slug: slug, note: (d.note || '').trim(), created: today() });
-  S.cfg.utm = list; S.utmD = { name: '', type: d.type || 'social', note: '' }; logAct({ k: 'utmadd', d: today() }); saveCfg(); toast(T('Метка создана: ссылка готова'));
+  S.cfg.utm = list; S.utmOpen = false; S.utmD = { name: '', type: d.type || 'social', note: '' }; logAct({ k: 'utmadd', d: today() }); saveCfg(); toast(T('Метка создана: ссылка готова'));
 }
 /* ---------- источники клиентов ---------- */
 function srcState() { if (!S.src) S.src = { state: 'idle', rows: [], msg: '' }; return S.src; }
@@ -387,6 +387,7 @@ document.addEventListener('click', function (ev) {
   S.armed = null;
   if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); if (id === 'src') loadSrc(); }
   else if (act === 'utm-type') { utmDraft().type = id; render(); }
+  else if (act === 'utm-form') { S.utmOpen = !S.utmOpen; render(); if (S.utmOpen) setTimeout(function () { var el = document.querySelector('[data-utm=name]'); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus(); } }, 60); }
   else if (act === 'utm-copy') { var uu = b.dataset.url || ''; try { navigator.clipboard.writeText(uu); } catch (e) { var tmp = document.createElement('input'); tmp.value = uu; document.body.appendChild(tmp); tmp.select(); document.execCommand('copy'); tmp.remove(); } var old = b.textContent; b.textContent = T('Скопировано'); setTimeout(function () { b.textContent = old; }, 1500); }
   else if (act === 'utm-add') utmAdd();
   else if (act === 'src-copy') { var inp = document.getElementById(id); if (inp) { inp.select(); try { navigator.clipboard.writeText(inp.value); } catch (e) { document.execCommand('copy'); } b.textContent = T('Скопировано'); } }
