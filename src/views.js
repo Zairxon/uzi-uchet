@@ -170,16 +170,20 @@ var METHNAME = { cash: 'наличные', card: 'карта', transfer: 'пер
 // Пациенты из «Ресепшена» за выбранный день
 function rcBlock(S, day) {
   var R = S.dayRc, h = '<h2>' + t('Из «Ресепшена»: пациенты дня') + '</h2>';
+  var head = function (n, sum) { return '<div class="rchead"><h2>' + t('Из «Ресепшена»: пациенты дня') + ' <span class="chip">' + n + '</span></h2><button type="button" class="btn ghost small" data-act="rc-toggle" aria-expanded="' + !!S.rcOpen + '">' + t(S.rcOpen ? 'Свернуть' : 'Показать') + '</button></div>' + (S.rcOpen ? '' : '<p class="small muted">' + t('Пациентов: {n}', { n: n }) + ' · ' + fmt(sum) + ' ' + t('сум') + '</p>'); };
   if (!S.sync.enabled || !S.sync.user) return h + '<p class="small muted">' + t('Войдите в «Настройки → Данные» (синхронизация), чтобы видеть пациентов из «Ресепшена».') + '</p>';
   if (R.state === 'loading' || R.state === 'idle') return h + '<p class="empty">' + t('Загрузка…') + '</p>';
   if (R.state === 'error') return h + '<p class="small muted">' + t('Не удалось получить данные клиники: {m}', { m: esc(R.msg) }) + '</p>';
   if (!R.rows.length) return h + '<p class="empty">' + t('В этот день оплат из «Ресепшена» не было.') + '</p>';
   var sum = 0, vis = 0;
   R.rows.forEach(function (x) { var a = x.kind === 'refund' ? -x.amount : +x.amount; sum += a; if (x.kind === 'visit') vis++; });
-  h += '<div class="panel"><div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Время') + '</th><th>' + t('Пациент') + '</th><th>' + t('Врач / услуга') + '</th><th class="r">' + t('Оплата') + ' / ' + t('Сумма') + '</th></tr></thead><tbody>' + R.rows.map(function (x) {
+  h = head(vis, sum);
+  if (!S.rcOpen) return h;
+  var num = 0;
+  h += '<div class="panel"><div class="scroll"><table class="rct grid srct rcp"><thead><tr><th>№</th><th>' + t('Время') + '</th><th>' + t('Пациент') + '</th><th>' + t('Врач / услуга') + '</th><th class="r">' + t('Оплата') + ' / ' + t('Сумма') + '</th></tr></thead><tbody>' + R.rows.map(function (x) {
     var ref = x.kind === 'refund', a = ref ? -x.amount : +x.amount, how = ref ? '↩ ' + t('возврат') + ' · ' + t(METHNAME[x.method] || 'наличные') : x.kind === 'deposit' ? '💳 ' + t('предоплата') : t(METHNAME[x.method] || 'наличные');
-    return '<tr' + (ref ? ' class="rrefund"' : '') + '><td class="num">' + esc(x.at) + '</td><td><b>' + esc(x.client_name || '—') + '</b>' + (x.finished ? '<br><span class="small muted">✔ ' + t('прошёл') + '</span>' : '') + '</td><td>' + esc(x.doctor_name || '') + (x.service ? '<br><span class="small muted">' + esc(x.service) + '</span>' : '') + '</td><td class="r"><span class="num ' + (a < 0 ? 'neg' : 'pos') + '"><b>' + (a < 0 ? '−' : '+') + fmt(Math.abs(a)) + '</b></span><br><span class="small muted">' + how + '</span></td></tr>';
-  }).join('') + '</tbody><tfoot><tr><td colspan="3"><b>' + t('Пациентов: {n}', { n: vis }) + '</b></td><td class="r num"><b>' + fmt(sum) + '</b></td></tr></tfoot></table></div></div>';
+    return '<tr' + (ref ? ' class="rrefund"' : '') + '><td class="num n">' + (x.kind === 'visit' ? ++num : '') + '</td><td class="num">' + esc(x.at) + '</td><td><b>' + esc(x.client_name || '—') + '</b>' + (x.finished ? '<br><span class="small muted">✔ ' + t('прошёл') + '</span>' : '') + '</td><td>' + esc(x.doctor_name || '') + (x.service ? '<br><span class="small muted">' + esc(x.service) + '</span>' : '') + '</td><td class="r"><span class="num ' + (a < 0 ? 'neg' : 'pos') + '"><b>' + (a < 0 ? '−' : '+') + fmt(Math.abs(a)) + '</b></span><br><span class="small muted">' + how + '</span></td></tr>';
+  }).join('') + '</tbody><tfoot><tr><td colspan="4"><b>' + t('Пациентов: {n}', { n: vis }) + '</b></td><td class="r num"><b>' + fmt(sum) + '</b></td></tr></tfoot></table></div></div>';
   return h;
 }
 

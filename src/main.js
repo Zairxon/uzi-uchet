@@ -413,6 +413,7 @@ document.addEventListener('click', function (ev) {
   else if (act === 'ops-next') { S.opsDay = addDays(S.opsDay, 1); dayRcLoad(); }
   else if (act === 'ops-today') { S.opsDay = today(); dayRcLoad(); }
   else if (act === 'lock-toggle') { var was = isLocked(S.M); S.cfg.locked = S.cfg.locked || {}; if (was) delete S.cfg.locked[S.M]; else S.cfg.locked[S.M] = true; logAct({ k: was ? 'unlock' : 'lock', d: S.M + '-01' }); render(); toast(T(was ? 'Месяц открыт' : 'Месяц закрыт: записи за него менять нельзя')); }
+  else if (act === 'rc-toggle') { S.rcOpen = !S.rcOpen; render(); }
   else if (act === 'audit-load') loadAudit();
   else if (act === 'audit-hide') { if (S.audit) S.audit.open = false; render(); }
   else if (act === 'export-ops') exportOps();
