@@ -1,6 +1,6 @@
 // Шесть вкладок. Разметка перенесена из прототипа без изменений; тексты идут через t() (русский / узбекский).
 // Состояние приходит в объекте S: { cfg, months, M, draft, armed, sync }.
-import qrcode from 'qrcode-generator';
+import { qrStyled } from './qrstyle.js';
 import { sched, payCalc, blank, ytd, compareTax, generalTax, compute } from './calc.js';
 import { addM, mName, ymOf, fmt, fmtM, esc, today } from './util.js';
 import { t, months, getLang } from './i18n.js';
@@ -369,16 +369,7 @@ export function vLoan(S) {
 // Источники клиентов: таблица за месяц и создание рекламных ссылок с меткой
 var SRC_SOURCES = [['instagram', 'Инстаграм'], ['telegram', 'Телеграм'], ['facebook', 'Фейсбук'], ['google', 'Гугл'], ['yandex', 'Яндекс'], ['2gis', '2ГИС'], ['flyer', 'Листовка'], ['barcode', 'Штрих-код'], ['other', 'Другое']];
 export function srcSlug(s) { return cyr2lat(String(s || '')).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40); }
-// QR-код ссылки: рисуется на холсте в PNG, чтобы его можно было скачать и напечатать
-function qrDataUrl(text) {
-  try {
-    var q = qrcode(0, 'M'); q.addData(text); q.make();
-    var n = q.getModuleCount(), mg = 4, sc = Math.max(4, Math.floor(900 / (n + 2 * mg))), size = (n + 2 * mg) * sc, c = document.createElement('canvas');
-    c.width = c.height = size; var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size); g.fillStyle = '#000';
-    for (var r = 0; r < n; r++) for (var k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect((k + mg) * sc, (r + mg) * sc, sc, sc);
-    return c.toDataURL('image/png');
-  } catch (e) { return ''; }
-}
+function qrDataUrl(text) { return qrStyled(text, 1200); }
 // «УТМ-отдел»: свои метки. Приложение само создаёт ссылку и QR-код, считает записи и выручку по каждой метке.
 var UTM_TYPES = [['social', 'Соцсеть'], ['site', 'Сайт'], ['person', 'Человек'], ['print', 'Листовка или QR'], ['other', 'Другое']];
 var UTM_PRESETS = [['Инстаграм', 'social'], ['Телеграм', 'social'], ['Фейсбук', 'social'], ['Ютуб', 'social'], ['Тикток', 'social'], ['Гугл', 'site'], ['Яндекс', 'site'], ['2ГИС', 'site']];

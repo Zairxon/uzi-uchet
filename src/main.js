@@ -21,6 +21,7 @@ import * as clinic from './clinic.js';
 import { fmtPhoneInput, cleanPhone } from './phone.js';
 import { t as T, getLang, setLang, brand } from './i18n.js';
 import { mountFooter } from './footer.js';
+import { onLogoReady } from './qrstyle.js';
 import { parseDate, maskDate, openCal, closeCal, fmtDate } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
 import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff, utmSlug } from './views.js';
@@ -60,6 +61,7 @@ function setChrome() {
 }
 document.addEventListener('click', function (ev) { var m = document.getElementById('langmenu'); if (m && !m.hidden && !ev.target.closest('#langmenu') && !ev.target.closest('#langbtn')) m.hidden = true; });
 document.getElementById('hero').src = heroUrl;
+onLogoReady(function () { if (ready) render(); });
 
 /* ---------- storage ---------- */
 function fail(e) {

@@ -484,3 +484,6 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .qrside .btn{text-decoration:none}
 
 .utmcard .uh{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+
+/* логотип клиники над названием */
+.hero-logo{display:block;margin:0 auto 6px;width:56px;height:auto;padding:6px 8px;border-radius:14px;background:#fffdf9;box-shadow:0 4px 14px rgba(70,30,0,.35)}
