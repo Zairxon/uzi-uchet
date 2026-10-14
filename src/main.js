@@ -69,14 +69,13 @@ function fail(e) {
 }
 function writeCfg() { if (db) store.saveConfig(S.cfg).then(queueSync).catch(fail); }
 function writeMonth(m) { if (db) store.saveMonth(m, S.months[m]).then(queueSync).catch(fail); }
-// Старые настройки: у медицинской организации налог с оборота недоступен (ст. 461 ч.2 п.14 НК), поэтому переходим на общий режим
+// Старые настройки: режим налогов остаётся таким, какой выбрал владелец (он отражает то, что клиника реально платит); новые значения по убыткам — по ст. 333 НК
 function fixCfg(c) {
   var tx = c.tax; if (tx.v2) return c;
   tx.v2 = true;
-  if (tx.regime === 'turnover' || tx.regime === 'profit') { tx.regime = 'general'; S.taxSwitched = true; }
   if (tx.lossYears === 5) tx.lossYears = 100;
   if (tx.lossLimit === 50) tx.lossLimit = 100;
-  setTimeout(function () { writeCfg(); if (S.taxSwitched) logAct({ k: 'taxmode', d: today() }); }, 0);
+  setTimeout(function () { writeCfg(); }, 0);
   return c;
 }
 function saveCfg() { writeCfg(); render(); }
