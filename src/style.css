@@ -488,3 +488,12 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
 /* операции за день и месяц: без общей рамки, как остальные разделы */
 .opsday,.opsmonth{padding:0;border:0;background:transparent;border-radius:0}
+
+/* таблица источников: шире ячейки, чтобы помещалась выручка с большими числами */
+.srct th,.srct td{padding:6px 8px!important}
+.srct td:first-child,.srct th:first-child{min-width:150px}
+.srct th.r,.srct td.r{min-width:66px}
+.srct th.rev,.srct td.rev{min-width:116px;white-space:nowrap}
+.srct td.acts{white-space:nowrap;min-width:92px}
+.srct td.acts .btn{display:inline-flex;vertical-align:middle;margin-right:4px}
+.srct .pen{min-width:36px;padding:2px 8px;font-size:15px}

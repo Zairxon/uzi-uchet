@@ -218,6 +218,12 @@ function wipe(id) {
 function utmDraft() { if (!S.utmD) S.utmD = { name: '', type: 'social', note: '' }; return S.utmD; }
 function utmAdd() {
   var d = utmDraft(), name = (d.name || '').trim(); if (name.length < 2) { toast(T('Введите название метки')); return; }
+  if (d.slug) { // правка: адрес (код) остаётся прежним, меняются название, тип и заметка
+    var lst = S.cfg.utm || [], cur = lst.filter(function (l) { return l.slug === d.slug; })[0];
+    if (cur) { if (!cur.med) cur.med = cur.type; cur.name = name; cur.type = d.type || cur.type; cur.note = (d.note || '').trim(); }
+    else lst.unshift({ id: uid(), name: name, type: d.type || 'other', med: 'other', slug: d.slug, note: (d.note || '').trim(), created: today() });
+    S.cfg.utm = lst; S.utmOpen = false; S.utmD = { name: '', type: 'social', note: '' }; logAct({ k: 'utmedit', d: today() }); saveCfg(); toast(T('Сохранено')); return;
+  }
   var base = utmSlug(name) || 'metka', slug = base, n = 2, list = S.cfg.utm || [];
   while (list.some(function (l) { return l.slug === slug; })) { slug = base.slice(0, 26) + n; n++; }
   list.unshift({ id: uid(), name: name, type: d.type || 'other', slug: slug, note: (d.note || '').trim(), created: today() });
@@ -391,9 +397,10 @@ document.addEventListener('click', function (ev) {
   S.armed = null;
   if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); if (id === 'src') loadSrc(); }
   else if (act === 'utm-type') { utmDraft().type = id; render(); }
-  else if (act === 'utm-form') { S.utmOpen = !S.utmOpen; render(); if (S.utmOpen) setTimeout(function () { var el = document.querySelector('[data-utm=name]'); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus(); } }, 60); }
+  else if (act === 'utm-form') { var wasEdit = S.utmD && S.utmD.slug; if (wasEdit) { S.utmD = { name: '', type: 'social', note: '' }; S.utmOpen = false; render(); return; } S.utmOpen = !S.utmOpen; render(); if (S.utmOpen) setTimeout(function () { var el = document.querySelector('[data-utm=name]'); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus(); } }, 60); }
   else if (act === 'utm-copy') { var uu = b.dataset.url || ''; try { navigator.clipboard.writeText(uu); } catch (e) { var tmp = document.createElement('input'); tmp.value = uu; document.body.appendChild(tmp); tmp.select(); document.execCommand('copy'); tmp.remove(); } var old = b.textContent; b.textContent = T('Скопировано'); setTimeout(function () { b.textContent = old; }, 1500); }
   else if (act === 'utm-add') utmAdd();
+  else if (act === 'utm-edit') { var cur0 = (S.cfg.utm || []).filter(function (l) { return l.slug === id; })[0]; S.utmD = cur0 ? { name: cur0.name, type: cur0.type, note: cur0.note || '', slug: cur0.slug } : { name: b.dataset.name || id, type: 'other', note: '', slug: id }; S.utmOpen = true; render(); setTimeout(function () { var el = document.querySelector('[data-utm=name]'); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus(); } }, 60); }
   else if (act === 'src-copy') { var inp = document.getElementById(id); if (inp) { inp.select(); try { navigator.clipboard.writeText(inp.value); } catch (e) { document.execCommand('copy'); } b.textContent = T('Скопировано'); } }
   else if (act === 'lang-set') { setLang(id); document.getElementById('langmenu').hidden = true; render(); }
   else if (act === 'lang-menu') { var lm = document.getElementById('langmenu'); lm.hidden = !lm.hidden; }
