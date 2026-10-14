@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { sched, payCalc, compute, ytd, balance } from '../src/calc.js';
+import { sched, payCalc, compute, ytd, balance, generalTax } from '../src/calc.js';
 import { DEF, merge, addM } from '../src/util.js';
 
-const cfgOf = (o = {}) => merge(DEF, Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)));
+const cfgOf = (o = {}) => merge(merge(DEF, { tax: { regime: 'turnover' } }), Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)));
 const op = (d, t, c, a, acct = 'bank') => ({ id: d + c + a, d, t, c, a, acct, n: '' });
 
 describe('sched: график кредита', () => {
@@ -198,7 +198,7 @@ describe('налог на прибыль: нарастающий итог и п�
     expect(compute(cfgP(), months, '2026-02').cur.tax).toBeCloseTo(-3e6, 6);
     expect(ytd(compute(cfgP(), months, '2026-02').rows, '2026-02').tax).toBeCloseTo(3e6, 6);
   });
-  it('убыток прошлого года уменьшает налог, но не больше заданной доли прибыли', () => {
+  it('убыток прошлого года уменьшает налог, но не больше заданной доли прибыли (если доля задана)', () => {
     const months = { '2025-06': mo('2025-06', 0, 100e6), '2026-03': mo('2026-03', 100e6, 60e6) };
     // прибыль 40 млн, убыток 100 млн покрывает не более 50% = 20 млн → база 20 млн
     expect(compute(cfgP({ lossLimit: 50 }), months, '2026-03').cur.tax).toBeCloseTo(3e6, 6);
@@ -221,5 +221,65 @@ describe('налог на прибыль: нарастающий итог и п�
     const months = { '2025-06': mo('2025-06', 0, 100e6), '2026-03': mo('2026-03', 100e6, 60e6) };
     const cfg = cfgP({ lossLimit: 50 }), C = compute(cfg, months, '2026-03');
     expect(compareTax(cfg, C.rows, '2026-03').loss).toBeCloseTo(100e6, 0);
+  });
+});
+
+describe('общий режим клиники: НДС 12% и налог на прибыль 0% / 15%', () => {
+  const cfgG = (extra) => cfgOf({ tax: { regime: 'general', ...(extra || {}) } });
+  const incOp = (d, a, c = 'usl') => ({ id: d + c + a, d, t: 'income', c, a, acct: 'cash', n: '' });
+  const expOp = (d, a, vat, c = 'supplies') => ({ id: d + c + a + vat, d, t: 'expense', c, a, acct: 'bank', n: '', vat });
+  it('цены с НДС: выручка без НДС, НДС начисляется как обязательство', () => {
+    const C = compute(cfgG(), { '2026-05': { ops: [incOp('2026-05-02', 11200000)] } }, '2026-05');
+    expect(C.cur.vatOut).toBeCloseTo(1200000, 6);
+    expect(C.cur.rev).toBeCloseTo(10000000, 6);
+    expect(C.cur.vat).toBeCloseTo(1200000, 6);
+    expect(C.B.pay.vat).toBeCloseTo(1200000, 6);
+    expect(C.B.cash).toBe(11200000);
+  });
+  it('входной НДС со счёта-фактуры уменьшает НДС к уплате и расходы, без счёта-фактуры не зачитывается', () => {
+    const ops = [incOp('2026-05-02', 11200000), expOp('2026-05-03', 1120000, true), expOp('2026-05-04', 560000, false)];
+    const C = compute(cfgG(), { '2026-05': { ops } }, '2026-05');
+    expect(C.cur.vatIn).toBeCloseTo(120000, 6);
+    expect(C.cur.vat).toBeCloseTo(1080000, 6);
+    expect(C.cur.opexSum).toBeCloseTo(1000000 + 560000, 6);
+  });
+  it('оплата НДС (pay_vat) гасит обязательство и не является расходом', () => {
+    const ops = [incOp('2026-05-02', 11200000), { id: 'p', d: '2026-06-10', t: 'expense', c: 'pay_vat', a: 1200000, acct: 'bank', n: '' }];
+    const C = compute(cfgG(), { '2026-05': { ops: [ops[0]] }, '2026-06': { ops: [ops[1]] } }, '2026-06');
+    expect(C.B.pay.vat).toBeCloseTo(0, 6);
+    expect(C.cur.opexSum).toBe(0);
+  });
+  it('налог на прибыль 0%, если не менее 90% дохода — медуслуги; иначе 15% со всей прибыли года', () => {
+    const base = [incOp('2026-03-05', 112000000), expOp('2026-03-06', 20000000, false)];
+    const ok = compute(cfgG(), { '2026-03': { ops: base } }, '2026-03');
+    expect(ok.cur.tax).toBe(0);
+    const bad = compute(cfgG(), { '2026-03': { ops: [...base, incOp('2026-03-07', 22400000, 'other_inc')] } }, '2026-03'); // 16,7% не от медуслуг
+    expect(bad.cur.tax).toBeGreaterThan(0);
+    expect(bad.cur.tax).toBeCloseTo(bad.cur.preTax * 0.15, 6);
+    expect(generalTax(cfgG(), ok.rows, '2026-03').zero).toBe(true);
+    expect(generalTax(cfgG(), bad.rows, '2026-03').zero).toBe(false);
+  });
+  it('убыток переносится без ограничений по сроку и доле', () => {
+    const cfg = cfgG({ social: false });
+    const months = { '2015-06': { ops: [expOp('2015-06-05', 100000000, false)] }, '2026-03': { ops: [incOp('2026-03-05', 112000000), expOp('2026-03-06', 20000000, false)] } };
+    // прибыль 2026: 100 − 20 = 80 млн, убыток 2015 (100 млн) гасит всё
+    expect(compute(cfg, months, '2026-03').cur.tax).toBeCloseTo(0, 6);
+  });
+  it('баланс сходится на случайных сценариях общего режима', () => {
+    const rng = (seed) => () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+    for (let s = 1; s <= 150; s++) {
+      const R = rng(s), pickv = () => R() < 0.5;
+      const months = {};
+      for (let k = 0; k < 8; k++) {
+        const m = addM('2026-01', k), ops = [];
+        for (let j = 0, n = Math.floor(R() * 8); j < n; j++) {
+          const inc = R() < 0.5, amt = Math.round(R() * 2e7) + 1;
+          ops.push(inc ? incOp(m + '-10', amt, R() < 0.8 ? 'usl' : 'other_inc') : expOp(m + '-11', amt, pickv(), ['supplies', 'util', 'equip', 'repair'][Math.floor(R() * 4)]));
+        }
+        if (R() < 0.3) ops.push({ id: 'pv' + m, d: m + '-15', t: 'expense', c: 'pay_vat', a: Math.round(R() * 3e6), acct: 'bank', n: '' });
+        months[m] = { ops };
+      }
+      for (let k = 0; k < 8; k++) { const C = compute(cfgG(), months, addM('2026-01', k)); expect(Math.abs(balance(C.B).check)).toBeLessThan(1e-3); }
+    }
   });
 });

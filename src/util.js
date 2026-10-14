@@ -1,7 +1,9 @@
 import { months } from './i18n.js';
 
 export const DEF = {
-  tax: { regime: 'turnover', turnover: 4, profit: 15, ndfl: 12, inps: 0.1, soc: 12, lossYears: 5, lossLimit: 50 },
+  // Медицинская организация (юрлицо): налог с оборота недоступен (ст. 461 ч.2 п.14 НК), общий режим: НДС 12% + налог на прибыль (0% в социальной сфере, если ≥90% дохода от лицензированных медуслуг, ст. 59 и 337 НК).
+  // Убыток прошлых лет переносится без ограничения срока и доли (ст. 333 НК, ЗРУ-741).
+  tax: { regime: 'general', turnover: 4, profit: 15, vat: 12, social: true, ndfl: 12, inps: 0.1, soc: 12, lossYears: 100, lossLimit: 100 },
   staff: [],
   locked: {},
   log: [],

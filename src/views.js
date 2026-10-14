@@ -1,6 +1,6 @@
 // Шесть вкладок. Разметка перенесена из прототипа без изменений; тексты идут через t() (русский / узбекский).
 // Состояние приходит в объекте S: { cfg, months, M, draft, armed, sync }.
-import { sched, payCalc, blank, ytd, compareTax } from './calc.js';
+import { sched, payCalc, blank, ytd, compareTax, generalTax, compute } from './calc.js';
 import { addM, mName, ymOf, fmt, fmtM, esc, today } from './util.js';
 import { t, months, getLang } from './i18n.js';
 import { fmtDate } from './datepicker.js';
@@ -12,7 +12,7 @@ export const TABS = [['home', 'Обзор'], ['ops', 'Операции'], ['pay'
 export const CATS = {
   income: [['usl', 'Услуги УЗИ'], ['other_inc', 'Прочий доход'], ['contrib', 'Взнос учредителя']],
   expense: [['supplies', 'Расходные материалы'], ['util', 'Коммунальные и связь'], ['ads', 'Реклама'], ['equip', 'Покупка техники'], ['repair', 'Обслуживание техники'], ['repair_bld', 'Ремонт здания (поломки)'], ['bank', 'Банковские комиссии'], ['other', 'Прочие расходы'],
-    ['pay_sal', 'Выплата зарплаты'], ['pay_ptax', 'Налоги с зарплаты'], ['pay_rent', 'Оплата аренды (с НДФЛ)'], ['pay_int', 'Проценты по кредиту'], ['pay_princ', 'Основной долг по кредиту'], ['pay_tax', 'Налог с оборота или прибыли'], ['dividend', 'Выплата учредителю']],
+    ['pay_sal', 'Выплата зарплаты'], ['pay_ptax', 'Налоги с зарплаты'], ['pay_rent', 'Оплата аренды (с НДФЛ)'], ['pay_int', 'Проценты по кредиту'], ['pay_princ', 'Основной долг по кредиту'], ['pay_tax', 'Налог с оборота или прибыли'], ['pay_vat', 'Оплата НДС'], ['dividend', 'Выплата учредителю']],
 };
 export const ACCTS = [['cash', 'Касса (наличные)'], ['card', 'Касса (карта)'], ['founder', 'Учредитель'], ['transfer', 'Перечисление']];
 const ACCTNAME = { cash: 'касса (нал.)', card: 'касса (карта)', founder: 'учредитель', transfer: 'перечисление', bank: 'банк' };
@@ -64,7 +64,8 @@ var LEGAL = [
   ['Предоплата только на счёт фирмы', 'Номер карты, который видят клиенты в «Навбате», лучше привязать к счёту фирмы, а не к личной карте. Деньги на личной карте налоговая может считать неучтённым доходом.'],
   ['Персональные данные клиентов', 'Имя, телефон и данные о приёмах — персональные данные. Нужно согласие клиента на обработку, защита базы и ограниченный доступ сотрудников. Данные о здоровье защищает ещё и врачебная тайна.'],
   ['Условия предоплаты и возврата', 'Правила предоплаты, переноса и возврата денег должны быть написаны понятно (оферта на сайте) и совпадать с тем, что вы делаете на практике. Возврат клиенту оформляйте записью в «Ресепшене», чтобы он попал в учёт.'],
-  ['Налоговый режим и порог оборота', 'Сверяйте выручку за год с порогом режима налога с оборота. При его превышении меняются режим и обязанности по налогам. Условия и ставки меняются, проверяйте их у бухгалтера.'],
+  ['Налоги медицинской организации', 'Юрлицо с медицинской лицензией: налог с оборота недоступен, НДС 12% платится с каждой услуги (отчёт и оплата до 20-го числа). Налог на прибыль 0%, если не менее 90% дохода — лицензированные медуслуги (косметология не входит); отчёт сдаётся раз в квартал даже при нуле.'],
+  ['Зарплатные налоги по срокам', 'НДФЛ, ИНПС и социальный налог (12%) считаются и платятся ежемесячно до 15-го числа следующего месяца. За год социальный налог сдаётся до 15 февраля.'],
   ['Зарплата и взносы', 'Платите зарплату официально: с НДФЛ, ИНПС и социальным налогом в срок. Ставки в разделе «Настройки → Налоги» проверяйте раз в год, при смене законодательства.'],
   ['Аренда у учредителя', 'Аренда здания у учредителя должна быть не ниже минимальной ставки, с договором и удержанием НДФЛ. Расчёт вы видите на вкладке «Кредит и аренда».'],
   ['Хранение документов', 'Договоры, чеки, акты и ведомости храните в порядке и в течение срока, который требует закон. Резервную копию данных «Главного» скачивайте каждый месяц.']
@@ -74,10 +75,18 @@ function tipsView(S, C) {
   var add = function (lv, txt) { tips.push('<li class="tip ' + lv + '"><span class="tip-ic" aria-hidden="true">' + ({ bad: '⚠️', warn: '💡', ok: '✅' })[lv] + '</span><span>' + txt + '</span></li>'); };
   var pc = function (x) { return Math.round(x * 100); };
   var exp = r.opexSum + r.payroll + r.rent + r.int + r.dep;
+  var gen = cfg.tax.regime === 'general', G = gen ? generalTax(cfg, C.rows, S.M) : null;
+  if (!gen) add('bad', t('Для медицинской организации (юридического лица) налог с оборота недоступен (ст. 461 НК). Переключите режим на «Общий: НДС + налог на прибыль» в Настройки → Налоги.'));
+  if (S.taxSwitched) add('warn', t('Режим налогов переключён с налога с оборота на общий: по закону клиника платит НДС 12%, а налог на прибыль у неё 0% при доле медуслуг не менее 90%. Проверьте настройки и отметки «счёт-фактура» в расходах.'));
+  if (gen && G.ytd.rev > 0) {
+    if (cfg.tax.social !== false && G.share < 0.9) add('bad', t('Доля доходов от медуслуг {p}% — меньше 90%. Тогда налог на прибыль 15% со всей прибыли года вместо 0%. Не записывайте как «Услуги УЗИ» то, что не относится к медуслугам, и держите прочие доходы ниже 10%.', { p: Math.round(G.share * 100) }));
+    else if (cfg.tax.social !== false && G.share < 0.93) add('warn', t('Доля доходов от медуслуг {p}% — близко к границе 90% для нулевой ставки налога на прибыль.', { p: Math.round(G.share * 100) }));
+    if (G.ytd.vat > 0) add('ok', t('НДС с начала года: начислено {a} сум, к зачёту {b} сум. Платится и отчёт сдаётся до 20-го числа следующего месяца.', { a: fmt(G.ytd.vatOut), b: fmt(G.ytd.vatIn) }));
+  }
   if (!Y.rev && !r.rev) add('warn', t('Пока мало данных для советов. Вносите операции и закрывайте месяцы зарплатой, и здесь появятся выводы.'));
-  if (Y.rev >= K.limit) add('bad', t('Выручка с начала года {n} сум превысила порог режима налога с оборота ({l} сум). Срочно уточните у бухгалтера, как это меняет налоги и отчётность.', { n: fmt(Y.rev), l: fmt(K.limit) }));
-  else if (Y.rev >= K.limit * 0.8) add('warn', t('Выручка с начала года {n} сум, это {p}% порога режима налога с оборота. Заранее обсудите с бухгалтером, что будет при превышении.', { n: fmt(Y.rev), p: pc(Y.rev / K.limit) }));
-  if (Y.rev > 0) {
+  if (!gen && Y.rev >= K.limit) add('bad', t('Выручка с начала года {n} сум превысила порог режима налога с оборота ({l} сум). Срочно уточните у бухгалтера, как это меняет налоги и отчётность.', { n: fmt(Y.rev), l: fmt(K.limit) }));
+  else if (!gen && Y.rev >= K.limit * 0.8) add('warn', t('Выручка с начала года {n} сум, это {p}% порога режима налога с оборота. Заранее обсудите с бухгалтером, что будет при превышении.', { n: fmt(Y.rev), p: pc(Y.rev / K.limit) }));
+  if (!gen && Y.rev > 0) {
     var cur = cfg.tax.regime === 'profit' ? Y.profit : Y.turnover, oth = cfg.tax.regime === 'profit' ? Y.turnover : Y.profit;
     if (oth < cur && cur - oth > Y.rev * 0.005) add('warn', t('По вашим цифрам другой режим выгоднее: налог меньше примерно на {n} сум с начала года. Это упрощённый расчёт, решение принимайте с бухгалтером.', { n: fmt(cur - oth) }));
   }
@@ -102,9 +111,31 @@ function tipsView(S, C) {
     '<details class="legal"><summary>' + t('Юридический минимум для клиники') + '</summary><ul class="list">' + LEGAL.map(function (x) { return '<li><div class="li-main"><b>' + t(x[0]) + '</b><span class="small muted">' + t(x[1]) + '</span></div></li>'; }).join('') + '</ul></details>' +
     '<p class="note">' + t('Советы построены по цифрам этого приложения и общим правилам. Они не заменяют бухгалтера и юриста: ставки, пороги и сроки меняются, сверяйте их с действующим законодательством.') + '</p></div></section>';
 }
+// Что и когда нужно сделать: сроки по Налоговому кодексу (lex.uz, редакция на 14.10.2026), суммы берутся из учёта
+function todoView(S) {
+  var cfg = S.cfg, gen = cfg.tax.regime === 'general', td = today(), cur = td.slice(0, 7), nx = addM(cur, 1), C2 = compute(cfg, S.months, nx), items = [];
+  var rowOf = function (ym) { return C2.rows.filter(function (q) { return q.m === ym; })[0]; };
+  var paidIn = function (ym, cats) { var s = 0; (((S.months[ym] || {}).ops) || []).forEach(function (o) { if (cats.indexOf(o.c) >= 0) s += o.a || 0; }); return s; };
+  var shift = function (d, n) { var x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  [cur, nx].forEach(function (dm) {
+    var per = addM(dm, -1), pay = (S.months[per] || {}).payroll, pr = rowOf(per), mo = +dm.slice(5, 7);
+    items.push({ d: dm + '-15', title: t('Зарплатные налоги за {m}: НДФЛ, ИНПС, социальный налог (отчёт и оплата)', { m: lc(per) }), a: pay ? (pay.ndfl || 0) + (pay.inps || 0) + (pay.soc || 0) : 0, paid: paidIn(dm, ['pay_ptax']), pay: true });
+    if (gen) items.push({ d: dm + '-20', title: t('НДС за {m}: отчёт и оплата', { m: lc(per) }), a: Math.max(0, pr ? pr.vat : 0), paid: paidIn(dm, ['pay_vat']), pay: true });
+    if ([1, 4, 7, 10].indexOf(mo) >= 0) items.push({ d: dm + '-20', title: t('Отчёт по налогу на прибыль за квартал (даже при ставке 0%)') });
+    if (mo === 2) items.push({ d: dm + '-15', title: t('Годовой расчёт по социальному налогу') });
+    if (mo === 3) items.push({ d: dm + '-01', title: t('Годовые отчёты: налог на прибыль и налог на имущество') });
+  });
+  var win = items.filter(function (x) { return x.d >= shift(td, -10) && x.d <= shift(td, 40); }).sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
+  if (!win.length) return '';
+  return '<section class="todo"><h2>' + t('Что делать сейчас') + '</h2><div class="panel"><ul class="list">' + win.map(function (x) {
+    var done = x.pay && x.a > 0 && x.paid >= x.a * 0.99, late = x.d < td && !done && x.pay && x.a > 0, chip = done ? '<span class="chip ok">✓ ' + t('оплачено') + '</span>' : late ? '<span class="chip bad">⚠ ' + t('просрочено') + '</span>' : '<span class="chip">' + fmtDate(x.d).slice(0, 5) + '</span>';
+    var sub = t('до {d}', { d: fmtDate(x.d) }) + (x.pay ? ' · ' + (x.a > 0 ? t('начислено {a} сум, внесено {p}', { a: fmt(x.a), p: fmt(x.paid) }) : t('начислений за период нет')) : '');
+    return '<li><div class="li-main"><b>' + x.title + '</b><span class="small muted">' + sub + '</span></div>' + chip + '</li>';
+  }).join('') + '</ul><p class="note">' + t('Суммы берутся из ваших операций и зарплаты. Платёж отметьте в «Операциях» (НДС — «Оплата НДС», зарплатные налоги — «Налоги с зарплаты»), тогда пункт станет зелёным.') + '</p></div></section>';
+}
 export function vHome(S, C) {
   var M = S.M, r = C.cur, B = C.B, exp = r.opexSum + r.payroll + r.rent + r.int + r.dep + r.tax;
-  var h = todayBlock(S) + '<section><h2>' + t('За {m}', { m: lc(M) }) + '</h2><div class="kpis">' +
+  var h = todayBlock(S) + todoView(S) + '<section><h2>' + t('За {m}', { m: lc(M) }) + '</h2><div class="kpis">' +
     '<div class="kpi"><span>' + t('Выручка') + '</span><b>' + fmt(r.rev) + '</b></div>' +
     '<div class="kpi"><span>' + t('Расходы и налог') + '</span><b>' + fmt(exp) + '</b></div>' +
     '<div class="kpi"><span>' + t('Чистая прибыль') + '</span><b class="' + (r.net < 0 ? 'neg' : 'pos') + '">' + fmt(r.net) + '</b></div>' +
@@ -112,7 +143,7 @@ export function vHome(S, C) {
     '<p class="small muted">' + t('Суммы в сумах за {m}. Касса: {c}, банк: {b}.', { m: lc(M), c: '<span class="num">' + fmt(B.cash) + '</span>', b: '<span class="num">' + fmt(B.bank) + '</span>' }) + '</p>' +
     '<h3 class="subh">' + t('Из чего складываются расходы за месяц') + '</h3><ul class="list">' + [['Расходы по внесённым операциям', r.opexSum], ['Зарплата с социальным налогом', r.payroll], ['Аренда', r.rent], ['Проценты по кредиту', r.int], ['Амортизация', r.dep], ['Налог с оборота или прибыли', r.tax]].filter(function (x) { return x[1] > 0; }).map(function (x) { return '<li><div class="li-main"><b>' + t(x[0]) + '</b></div><span class="num">' + fmt(x[1]) + '</span></li>'; }).join('') + '</ul>' +
     (r.net < 0 ? '<p class="note">' + t('Прибыль отрицательная: выручка месяца меньше расходов. Аренда, зарплата, проценты и амортизация начисляются за месяц целиком, даже если по операциям расходов нет.') + '</p>' : '') + '</section>';
-  var due = [['Кредит, остаток основного долга', B.loan], ['Зарплата и налоги с неё', B.pay.wage], ['Аренда', B.pay.rent], ['Проценты по кредиту', B.pay.int], ['Налог с оборота или прибыли', B.pay.tax]];
+  var due = [['Кредит, остаток основного долга', B.loan], ['Зарплата и налоги с неё', B.pay.wage], ['Аренда', B.pay.rent], ['Проценты по кредиту', B.pay.int], ['Налог с оборота или прибыли', B.pay.tax], ['НДС к уплате', B.pay.vat]];
   h += '<section><h2>' + t('Долги на конец месяца') + '</h2><ul class="list">' + due.map(function (d) { return '<li><div class="li-main"><b>' + t(d[0]) + '</b></div><span class="num">' + fmt(d[1]) + '</span></li>'; }).join('') + '</ul>' +
     '<p class="note">' + t('Начислено, но ещё не оплачено. Отрицательная сумма означает переплату.') + '</p></section>';
   var last = []; for (var k = 5; k >= 0; k--) { var m = addM(M, -k), x = C.rows.filter(function (q) { return q.m === m; })[0] || blank(m); last.push(x); }
@@ -133,7 +164,7 @@ function opTime(o) {
 
 function opRow(S, o, canDel) {
   var rc = String(o.id).indexOf('rc:') === 0, name = rc ? (o.id.split(':')[3] === 'deposit' ? t('Ресепшен: предоплаты ({n})', { n: o.cnt || '' }) : o.id.split(':')[3] === 'refund' ? t('Ресепшен: возвраты ({n})', { n: o.cnt || '' }) : t('Ресепшен: приём ({n})', { n: o.cnt || '' })) : (CATNAME[o.c] ? t(CATNAME[o.c]) : o.c);
-  return '<li><div class="li-main"><b>' + esc(name) + (rc ? ' <span class="chip">' + t('авто') + '</span>' : '') + (!rc && o.t === 'income' && o.chk === false ? ' <span class="chip warn">' + t('без чека') + '</span>' : '') + '</b><span class="small muted">' + (opTime(o) ? opTime(o) + ' · ' : '') + t(ACCTNAME[o.acct] || 'касса') + (o.n ? ' · ' + esc(o.n) : '') + '</span></div><span class="num ' + ((o.t === 'income') === ((o.a || 0) >= 0) ? 'pos' : 'neg') + '">' + ((o.t === 'income') === ((o.a || 0) >= 0) ? '+' : '−') + fmt(Math.abs(o.a || 0)) + '</span>' + (canDel && !rc ? delBtn(S, 'del-op', o.id) : '') + '</li>';
+  return '<li><div class="li-main"><b>' + esc(name) + (rc ? ' <span class="chip">' + t('авто') + '</span>' : '') + (!rc && o.t === 'expense' && o.vat ? ' <span class="chip">' + t('НДС') + '</span>' : '') + (!rc && o.t === 'income' && o.chk === false ? ' <span class="chip warn">' + t('без чека') + '</span>' : '') + '</b><span class="small muted">' + (opTime(o) ? opTime(o) + ' · ' : '') + t(ACCTNAME[o.acct] || 'касса') + (o.n ? ' · ' + esc(o.n) : '') + '</span></div><span class="num ' + ((o.t === 'income') === ((o.a || 0) >= 0) ? 'pos' : 'neg') + '">' + ((o.t === 'income') === ((o.a || 0) >= 0) ? '+' : '−') + fmt(Math.abs(o.a || 0)) + '</span>' + (canDel && !rc ? delBtn(S, 'del-op', o.id) : '') + '</li>';
 }
 var METHNAME = { cash: 'наличные', card: 'карта', transfer: 'перечисление' };
 // Пациенты из «Ресепшена» за выбранный день
@@ -163,7 +194,7 @@ export function vOps(S) {
     '<label class="fld"><span>' + t('Сумма, сум') + '</span><input id="op-amount" type="text" inputmode="numeric" class="n" data-d="amount" data-kind="money" value="' + esc(draft.amount) + '" placeholder="0"></label>' +
     '<label class="fld"><span>' + t('Категория') + '</span>' + sel('op-cat', cats, draft.cat, 'data-d="cat"') + '</label>' +
     '<label class="fld"><span>' + t('Счёт') + '</span>' + sel('op-acct', ACCTS, draft.acct, 'data-d="acct"') + '</label>' +
-    '</div>' + (draft.type === 'income' && draft.cat !== 'contrib' ? '<label class="chkrow"><input type="checkbox" data-d="chk"' + (draft.chk !== false ? ' checked' : '') + '><span>' + t('Чек выдан клиенту') + '</span></label>' : '') + '<label class="fld"><span>' + t('Комментарий') + '</span><input id="op-note" type="text" data-d="note" value="' + esc(draft.note) + '" placeholder="' + esc(t(draft.cat === 'equip' ? 'Название и модель, например: УЗИ-аппарат Миндрей ДС-70' : 'Например: закупка расходников')) + '"></label>' +
+    '</div>' + (draft.type === 'expense' && S.cfg.tax.regime === 'general' && ['supplies', 'util', 'ads', 'equip', 'repair', 'repair_bld', 'other'].indexOf(draft.cat) >= 0 ? '<label class="chkrow"><input type="checkbox" data-d="vat"' + (draft.vat ? ' checked' : '') + '><span>' + t('Есть счёт-фактура с НДС (НДС пойдёт к зачёту)') + '</span></label>' : '') + (draft.type === 'income' && draft.cat !== 'contrib' ? '<label class="chkrow"><input type="checkbox" data-d="chk"' + (draft.chk !== false ? ' checked' : '') + '><span>' + t('Чек выдан клиенту') + '</span></label>' : '') + '<label class="fld"><span>' + t('Комментарий') + '</span><input id="op-note" type="text" data-d="note" value="' + esc(draft.note) + '" placeholder="' + esc(t(draft.cat === 'equip' ? 'Название и модель, например: УЗИ-аппарат Миндрей ДС-70' : 'Например: закупка расходников')) + '"></label>' +
     (draft.cat === 'equip' ? '<p class="note">' + t('Купленная техника записывается как имущество и списывается в расходы по частям (60 месяцев). В «Кредит и аренда» её можно выбрать как цель кредита.') + '</p>' : '') +
     (draft.acct === 'founder' ? '<p class="note">' + t('«Учредитель»: оплата из личных денег учредителя. Деньги клиники не меняются, сумма записывается как вклад учредителя.') + '</p>' : '') +
     '<div class="row gaptop"><button class="btn" type="submit">' + t('Добавить') + '</button></div></form>' +
@@ -428,9 +459,9 @@ function idx2(ym) { return (+ym.slice(0, 4)) * 12 + (+ym.slice(5, 7)) - 1; }
 export function vRep(S, C) {
   var cfg = S.cfg, M = S.M, mn = months()[+M.slice(5, 7) - 1];
   var r = C.cur, y = ytd(C.rows, M), B = C.B, c = r.cf;
-  var taxL = cfg.tax.regime === 'profit' ? t('Налог на прибыль {n}%', { n: cfg.tax.profit }) : t('Налог с оборота {n}%', { n: cfg.tax.turnover });
+  var taxL = cfg.tax.regime === 'general' ? t('Налог на прибыль') : cfg.tax.regime === 'profit' ? t('Налог на прибыль {n}%', { n: cfg.tax.profit }) : t('Налог с оборота {n}%', { n: cfg.tax.turnover });
   var plH = '<section><h2>' + t('Прибыль и убытки') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
-    tr('Выручка', [r.rev, y.rev], 'sum') + OPEX.map(function (k) { return tr(CATNAME[k], [r.opex[k] || 0, y.opex[k] || 0]); }).join('') +
+    tr(cfg.tax.regime === 'general' ? 'Выручка без НДС' : 'Выручка', [r.rev, y.rev], 'sum') + OPEX.map(function (k) { return tr(CATNAME[k], [r.opex[k] || 0, y.opex[k] || 0]); }).join('') +
     tr('Зарплата с социальным налогом', [r.payroll, y.payroll]) + tr('Аренда', [r.rent, y.rent]) + tr('Проценты по кредиту', [r.int, y.int]) + tr('Амортизация', [r.dep, y.dep]) +
     tr('Прибыль до налога', [r.preTax, y.preTax], 'sum') + tr(taxL, [r.tax, y.tax]) + tr('Чистая прибыль', [r.net, y.net], 'sum') + '</tbody></table></div></section>';
   var h = '';
@@ -447,6 +478,14 @@ export function vRep(S, C) {
     tr(t('Налог с оборота {n}%', { n: String(cfg.tax.turnover).replace('.', ',') }), [K.month.turnover, K.ytd.turnover], cur === 'turnover' ? 'sum' : '') +
     tr(t('Налог на прибыль {n}%', { n: String(cfg.tax.profit).replace('.', ',') }), [K.month.profit, K.ytd.profit], cur === 'profit' ? 'sum' : '') +
     tr('Разница (оборот − прибыль)', [K.month.turnover - K.month.profit, K.ytd.turnover - K.ytd.profit]) + '</tbody></table></div></section>';
+  var G = generalTax(cfg, C.rows, M), GM = G.month || blank(M), GY = G.ytd, shp = Math.round(G.share * 100);
+  var genH = '<section><h2>' + t('Налоги клиники: НДС и прибыль') + '</h2><div class="scroll"><table><thead><tr><th></th><th>' + mn + '</th><th>' + t('С начала года') + '</th></tr></thead><tbody>' +
+    tr('Выручка без НДС', [GM.rev, GY.rev]) + tr('НДС начислен с выручки', [GM.vatOut, GY.vatOut]) + tr('НДС к зачёту по счетам-фактурам', [-GM.vatIn, -GY.vatIn]) + tr('НДС к уплате', [GM.vat, GY.vat], 'sum') +
+    tr('Прибыль до налога', [GM.preTax, GY.preTax]) + tr('Налог на прибыль', [GM.tax, GY.tax], 'sum') + '</tbody></table></div></section>' +
+    '<section><div class="panel"><p class="small"><b>' + t('Доля доходов от медицинских услуг с начала года: {p}%', { p: shp }) + '</b></p><div class="bar" style="width:' + Math.min(100, shp) + '%;height:6px"></div>' +
+    (cfg.tax.social === false ? '<p class="small muted">' + t('Льгота социальной сферы выключена в настройках: налог на прибыль по ставке {n}%.', { n: cfg.tax.profit }) + '</p>' : G.zero ? '<p class="small muted">' + t('Не меньше 90%: налог на прибыль 0% (социальная сфера, ст. 59 и 337 НК). Отчёт всё равно сдаётся.') + '</p>' : '<p class="alert">' + t('Меньше 90%: налог на прибыль считается по ставке {n}% со всей прибыли года. Доходы не от медуслуг не должны превышать 10%.', { n: cfg.tax.profit }) + '</p>') +
+    (G.loss > 0 ? '<p class="small">' + t('Убыток прошлых лет, который ещё можно учесть: {n} сум', { n: fmt(G.loss) }) + '</p>' : '') + '</div>' +
+    '<p class="note">' + t('НДС 12% включён в цены услуг. Налоговая строит отчёт по НДС из ваших фискальных чеков и счетов-фактур, поэтому в чеках нужны верные коды ИКПУ. Входной НДС зачитывается только по счёту-фактуре: отмечайте её в расходе. По сообщениям СМИ (апрель 2026) клиникам разрешён возврат части уплаченного НДС (20%) при доле доходов от медуслуг не менее 70%: порядок уточните в налоговой.') + '</p></section>';
   var cmpRest = '<section><p class="' + (cmp(K.ytd) === cur ? 'small muted' : 'alert') + '">' + (K.ytd.rev === 0 ? t('Пока нет выручки за год, сравнивать нечего.') :
       t('С начала года выгоднее {r}: он меньше на {n} сум.', { r: cmp(K.ytd) === 'turnover' ? t('налог с оборота') : t('налог на прибыль'), n: fmt(Math.abs(K.ytd.turnover - K.ytd.profit)) }) +
       (cmp(K.ytd) === cur ? t(' Сейчас выбран именно он.') : t(' Сейчас выбран другой режим (вкладка «Настройки»).'))) + '</p>' +
@@ -454,15 +493,15 @@ export function vRep(S, C) {
     (K.loss > 0 ? '<p class="small"><b>' + t('Убыток прошлых лет, который ещё можно учесть: {n} сум', { n: fmt(K.loss) }) + '</b></p>' : '') +
     '<p class="note">' + t('Налог месяца может быть отрицательным: убыточный месяц уменьшает налог, начисленный с начала года.') + '</p>' +
     '<p class="note">' + t('Сравнение упрощённое: налог на прибыль считается нарастающим итогом за год с переносом убытка прошлых лет по настройкам, без квартальных авансов и вычетов. Налог с оборота возможен только при выручке до 1 млрд сум в год. Какой режим применять, решает бухгалтер: программа ведёт внутренний учёт.') + '</p></section>';
-  var fa = B.fa - B.dep, A = B.cash + B.bank + fa, L = B.loan + B.pay.wage + B.pay.rent + B.pay.int + B.pay.tax, E = B.contrib - B.div + B.profit;
+  var fa = B.fa - B.dep, A = B.cash + B.bank + fa, L = B.loan + B.pay.wage + B.pay.rent + B.pay.int + B.pay.tax + B.pay.vat, E = B.contrib - B.div + B.profit;
   var balH = '<section><h2>' + t('Баланс на конец месяца') + '</h2><div class="scroll"><table><tbody>' +
     tr('Активы', [''], 'head') + tr('Касса', [B.cash]) + tr('Банк', [B.bank]) + tr('Оборудование и ремонт за вычетом амортизации', [fa]) + tr('Итого активы', [A], 'sum') +
-    tr('Обязательства', [''], 'head') + tr('Кредит', [B.loan]) + tr('Зарплата и налоги с неё', [B.pay.wage]) + tr('Аренда', [B.pay.rent]) + tr('Проценты', [B.pay.int]) + tr('Налог с оборота или прибыли', [B.pay.tax]) + tr('Итого обязательства', [L], 'sum') +
+    tr('Обязательства', [''], 'head') + tr('Кредит', [B.loan]) + tr('Зарплата и налоги с неё', [B.pay.wage]) + tr('Аренда', [B.pay.rent]) + tr('Проценты', [B.pay.int]) + tr('Налог с оборота или прибыли', [B.pay.tax]) + tr('НДС к уплате', [B.pay.vat]) + tr('Итого обязательства', [L], 'sum') +
     tr('Капитал', [''], 'head') + tr('Взносы учредителя', [B.contrib]) + tr('Выплаты учредителю', [-B.div]) + tr('Накопленная прибыль', [B.profit]) + tr('Итого капитал', [E], 'sum') +
     tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div></section>';
   var balN = '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p>';
   // один отчёт на экране: таблицы на всю ширину, переключатель сверху
-  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), src: srcView(S), cmp: cmpH + cmpRest };
+  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), src: srcView(S), cmp: cfg.tax.regime === 'general' ? genH : cmpH + cmpRest };
   var rv = blocks[S.repView] ? S.repView : 'pl';
   var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['src', 'Источники'], ['cmp', 'Налоги']].map(function (x) {
     return '<button type="button" role="tab" data-act="rep-view" data-id="' + x[0] + '" aria-pressed="' + (rv === x[0]) + '">' + t(x[1]) + '</button>';
@@ -567,18 +606,18 @@ export function vSet(S) {
   var tab = S.setTab || 'clinic';
   var tabs = '<div class="seg four settabs" role="tablist">' + [['clinic', 'Клиника'], ['prepay', 'Предоплата'], ['tax', 'Налоги'], ['data', 'Данные']].map(function (x) { return '<button type="button" data-act="set-tab" data-id="' + x[0] + '" aria-pressed="' + (tab === x[0]) + '">' + t(x[1]) + '</button>'; }).join('') + '</div>';
   var taxHtml = '<section><h2>' + t('Налоговый режим') + '</h2><div class="panel"><label class="fld"><span>' + t('Как фирма платит налог') + '</span>' +
-    sel('f-tax-regime', [['turnover', 'Налог с оборота (выручка до 1 млрд сум в год)'], ['profit', 'Налог на прибыль (выручка выше 1 млрд сум)']], tx.regime, 'data-bind="tax.regime" data-kind="text"') + '</label>' +
-    '<div class="grid">' + inp(S, t('Налог с оборота, %'), 'tax.turnover', 'num') + inp(S, t('Налог на прибыль, %'), 'tax.profit', 'num') + inp(S, t('Перенос убытка, лет'), 'tax.lossYears', 'num') + inp(S, t('Убыток покрывает не более, % прибыли'), 'tax.lossLimit', 'num') + '</div>' +
-    '<p class="note">' + t('Налог на прибыль считается нарастающим итогом с начала года. Убыток года, закончившегося убытком, можно учесть в следующие годы: сколько лет и какую долю прибыли он может покрыть, зависит от закона. Проверьте эти два числа у бухгалтера.') + '</p></div></section>' +
+    sel('f-tax-regime', [['general', 'Общий: НДС 12% + налог на прибыль (для клиники)'], ['turnover', 'Налог с оборота (для клиники недоступен)'], ['profit', 'Только налог на прибыль, без НДС']], tx.regime, 'data-bind="tax.regime" data-kind="text"') + '</label>' +
+    '<div class="grid">' + inp(S, t('НДС, %'), 'tax.vat', 'num') + inp(S, t('Налог с оборота, %'), 'tax.turnover', 'num') + inp(S, t('Налог на прибыль, %'), 'tax.profit', 'num') + inp(S, t('Перенос убытка, лет'), 'tax.lossYears', 'num') + inp(S, t('Убыток покрывает не более, % прибыли'), 'tax.lossLimit', 'num') + '</div><label class="chkrow"><input type="checkbox" data-bind="tax.social"' + (tx.social !== false ? ' checked' : '') + '><span>' + t('Медицинская организация в социальной сфере (не менее 90% дохода — медуслуги): налог на прибыль 0%') + '</span></label>' +
+    '<p class="note">' + t('Налог на прибыль считается нарастающим итогом с начала года. Убыток прошлых лет по ст. 333 НК переносится без ограничения срока и доли, поэтому по умолчанию 100 лет и 100%.') + '</p></div></section>' +
     '<section><h2>' + t('Ставки с зарплаты') + '</h2><div class="panel"><div class="grid">' + inp(S, t('НДФЛ, %'), 'tax.ndfl', 'num') + inp(S, t('ИНПС, %'), 'tax.inps', 'num') + inp(S, t('Социальный налог, %'), 'tax.soc', 'num') + '</div></div>' +
-    '<p class="note">' + t('Ставки по умолчанию взяты на 2026 год и сверены 10.10.2026. Перед сдачей отчётности сверяйте суммы с бухгалтером и my.soliq.uz: программа ведёт внутренний учёт и официальную отчётность не заменяет.') + '</p></section>' +
+    '<p class="note">' + t('Ставки по умолчанию сверены с Налоговым кодексом (lex.uz) 14.10.2026. Перед сдачей отчётности сверяйте суммы с бухгалтером и my.soliq.uz: программа ведёт внутренний учёт и официальную отчётность не заменяет.') + '</p></section>' +
     '';
   var wipeRow = function (id, title, desc) { return '<li><div class="li-main"><b>' + t(title) + '</b><span class="small muted">' + t(desc) + '</span></div><button type="button" class="btn ghost danger" data-act="wipe" data-id="' + id + '"' + (S.wipeBusy ? ' disabled' : '') + '>' + t('Удалить') + '</button></li>'; };
   var wipeHtml = '<section><h2>' + t('Очистка данных') + '</h2><div class="panel"><p class="small muted">' + t('Удаляйте данные по отдельности или всё сразу, чтобы начать с чистого листа. Удалённое не вернуть, поэтому сначала скачайте резервную копию. Врачи, услуги, цены предоплаты, карта, адрес и сотрудники не удаляются.') + '</p><ul class="list">' +
     wipeRow('appointments', 'Записи и приёмы', 'Все записи «Ресепшена»: оплаты, возвраты, неявки и фото чеков.') + wipeRow('clients', 'Клиенты', 'База клиентов «Ресепшена» с историей.') + wipeRow('receipts', 'Фото чеков', 'Только фотографии чеков в хранилище.') + wipeRow('bot', 'Состояния бота', 'Выбранный язык и незаконченные записи в Telegram-боте.') +
     wipeRow('ops', 'Операции и зарплата', 'Доходы, расходы и зарплата по всем месяцам в «Главном».') + wipeRow('loan', 'Кредит и аренда', 'Суммы, сроки и цель кредита, аренда.') + wipeRow('assets', 'Техника и оборудование', 'Список техники с амортизацией.') + wipeRow('staff', 'Сотрудники клиники', 'Список сотрудников и ставки в «Главном».') +
     '</ul><div class="row gaptop"><button type="button" class="btn danger solid" data-act="wipe" data-id="all"' + (S.wipeBusy ? ' disabled' : '') + '>' + t('Удалить всё и начать с нуля') + '</button></div></div></section>';
-  var LOGK = { add: 'Добавлена операция', del: 'Удалена операция', lock: 'Месяц закрыт', unlock: 'Месяц открыт', unaccrue: 'Отменено начисление зарплаты' };
+  var LOGK = { add: 'Добавлена операция', del: 'Удалена операция', lock: 'Месяц закрыт', unlock: 'Месяц открыт', unaccrue: 'Отменено начисление зарплаты', taxmode: 'Режим налогов переключён на общий (НДС + налог на прибыль)' };
   var logs = (S.cfg.log || []).slice(0, 40);
   var logHtml = '<section><h2>' + t('Журнал действий') + '</h2><div class="panel">' + (logs.length ? '<ul class="list">' + logs.map(function (e) {
     var when = ''; try { when = new Date(e.ts).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (x) { /* без времени */ }

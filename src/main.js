@@ -30,9 +30,10 @@ window.__appReady = true;
 var S = {
   cfg: clone(DEF), months: {}, M: ymOf(today()), tab: 'home', armed: null,
   theme: 'auto', repView: 'pl', clinic: { state: 'idle', rows: [], msg: '' }, opsDay: today(), dayRc: { state: 'idle', rows: [], msg: '' }, staffOpen: false, editStaff: '', rcBusy: false, info: { state: 'idle', s: null, d: [], msg: '', busy: false }, setTab: (function () { try { return localStorage.getItem('uzi-settab') || 'clinic'; } catch (e) { return 'clinic'; } })(), pp: { state: 'idle', s: null, svc: [], removed: [], setup: null, msg: '', busy: false }, sync: { enabled: sync.enabled, user: null, state: 'idle', msg: '', last: '', email: '', pass: '', busy: false },
-  draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '', chk: true },
+  draft: { date: today(), type: 'income', cat: 'usl', amount: '', acct: 'cash', note: '', chk: true, vat: false },
 };
 var db = false, ready = false, rendering = false;
+var VAT_CATS = ['supplies', 'util', 'ads', 'equip', 'repair', 'repair_bld', 'other'];
 var CATNAME_ = {}; CATS.income.concat(CATS.expense).forEach(function (c) { CATNAME_[c[0]] = c[1]; });
 var ACCT_NAME = { cash: 'касса (нал.)', card: 'касса (карта)', founder: 'учредитель', transfer: 'перечисление', bank: 'банк' };
 try { var rv0 = localStorage.getItem('uzi-rep'); if (['pl', 'cash', 'bal', 'loan', 'src', 'cmp'].indexOf(rv0) >= 0) S.repView = rv0; } catch (e) { /* без запоминания */ }
@@ -68,6 +69,16 @@ function fail(e) {
 }
 function writeCfg() { if (db) store.saveConfig(S.cfg).then(queueSync).catch(fail); }
 function writeMonth(m) { if (db) store.saveMonth(m, S.months[m]).then(queueSync).catch(fail); }
+// Старые настройки: у медицинской организации налог с оборота недоступен (ст. 461 ч.2 п.14 НК), поэтому переходим на общий режим
+function fixCfg(c) {
+  var tx = c.tax; if (tx.v2) return c;
+  tx.v2 = true;
+  if (tx.regime === 'turnover' || tx.regime === 'profit') { tx.regime = 'general'; S.taxSwitched = true; }
+  if (tx.lossYears === 5) tx.lossYears = 100;
+  if (tx.lossLimit === 50) tx.lossLimit = 100;
+  setTimeout(function () { writeCfg(); if (S.taxSwitched) logAct({ k: 'taxmode', d: today() }); }, 0);
+  return c;
+}
 function saveCfg() { writeCfg(); render(); }
 // Закрытый месяц: операции и зарплату за него нельзя менять, пока владелец не откроет месяц
 function isLocked(ym) { return !!(S.cfg.locked && S.cfg.locked[ym]); }
@@ -82,10 +93,10 @@ function csvCell(v) { var s = String(v == null ? '' : v); return /[;"\n\r]/.test
 function csvDownload(name, rows) { store.downloadText(name, '\ufeff' + rows.map(function (r) { return r.map(csvCell).join(';'); }).join('\r\n') + '\r\n', 'text/csv;charset=utf-8'); }
 function exportOps() {
   var ops = ((S.months[S.M] && S.months[S.M].ops) || []).slice().sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
-  var rows = [[T('Дата'), T('Тип'), T('Категория'), T('Счёт'), T('Сумма, сум'), T('Чек выдан'), T('Комментарий')]];
+  var rows = [[T('Дата'), T('Тип'), T('Категория'), T('Счёт'), T('Сумма, сум'), T('Чек выдан'), T('НДС в счёте-фактуре'), T('Комментарий')]];
   ops.forEach(function (o) {
     var rc = String(o.id).indexOf('rc:') === 0, cn = rc ? T('Ресепшен: приём') : (CATNAME_[o.c] ? T(CATNAME_[o.c]) : o.c);
-    rows.push([fmtDate(o.d), T(o.t === 'income' ? 'Поступление' : 'Списание'), cn, T(ACCT_NAME[o.acct] || 'касса (нал.)'), String(Math.round(o.a || 0)), o.t === 'income' && !rc ? T(o.chk === false ? 'нет' : 'да') : '', o.n || '']);
+    rows.push([fmtDate(o.d), T(o.t === 'income' ? 'Поступление' : 'Списание'), cn, T(ACCT_NAME[o.acct] || 'касса (нал.)'), String(Math.round(o.a || 0)), o.t === 'income' && !rc ? T(o.chk === false ? 'нет' : 'да') : '', o.t === 'expense' && o.vat ? T('да') : '', o.n || '']);
   });
   csvDownload('operacii-' + S.M + '.csv', rows); toast(T('Файл скачан: операции за {m}', { m: mName(S.M).toLowerCase() }));
 }
@@ -118,7 +129,7 @@ function doSync(manual) {
   y.state = 'busy'; y.msg = ''; setStatus(); if (manual) render();
   return sync.syncNow().then(function (r) {
     y.state = 'ok'; y.last = hhmm(); y.at = Date.now();
-    if (r && r.changed) return store.loadAll().then(function (got) { S.cfg = merge(DEF, got.cfg); S.months = got.months; });
+    if (r && r.changed) return store.loadAll().then(function (got) { S.cfg = fixCfg(merge(DEF, got.cfg)); S.months = got.months; });
   }).catch(function (e) {
     console.error(e); y.state = 'error'; y.msg = navigator.onLine ? sync.describeError(e) : T('нет сети');
   }).then(function () { render(); });
@@ -180,7 +191,7 @@ function wipeLocal(ids) {
   if (ids.indexOf('staff') >= 0) cfg.staff = [];
   if (ids.indexOf('ops') >= 0) months = {};
   return (db ? store.replaceAll(cfg, months) : Promise.resolve()).then(function () {
-    S.cfg = merge(DEF, cfg); S.months = {};
+    S.cfg = fixCfg(merge(DEF, cfg)); S.months = {};
     Object.keys(months).forEach(function (k) { S.months[k] = months[k]; });
     queueSync();
   });
@@ -308,7 +319,7 @@ function backupLoad(file) {
     return askConfirm(T('Заменить все текущие данные данными из копии (месяцев: {n})? Текущие данные будут стёрты.', { n: n }), T('Заменить'), T('Отмена')).then(function (ok) {
       if (!ok) return null;
       return (db ? store.replaceAll(b.cfg, b.months) : Promise.resolve()).then(function () {
-        S.cfg = merge(DEF, b.cfg); S.months = {};
+        S.cfg = fixCfg(merge(DEF, b.cfg)); S.months = {};
         Object.keys(b.months).forEach(function (k) { var x = clone(b.months[k]); if (!x.ops) x.ops = []; S.months[k] = x; });
         render(); toast(T('Данные загружены из копии')); queueSync();
       });
@@ -453,6 +464,7 @@ document.addEventListener('submit', function (ev) {
   if (!validDate(dr.date)) { toast(T('Проверьте год в дате')); return; }
   var m = ymOf(dr.date); if (isLocked(m)) { toast(T(LOCK_MSG)); return; }
   var nop = { id: uid(), d: dr.date, t: dr.type, c: dr.cat, a: a, acct: dr.acct, n: dr.note.trim() }; if (dr.type === 'income' && dr.cat !== 'contrib') nop.chk = dr.chk !== false;
+  if (dr.type === 'expense' && dr.vat && S.cfg.tax.regime === 'general' && VAT_CATS.indexOf(dr.cat) >= 0) nop.vat = true;
   mdoc(m).ops.push(nop); logAct({ k: 'add', c: dr.cat, a: a, d: dr.date });
   dr.amount = ''; dr.note = ''; var moved = m !== S.M; S.M = m; saveMonth(m);
   toast(moved ? T('Добавлено. Открыт {m}', { m: mName(m).toLowerCase() }) : T('Добавлено'));
@@ -466,7 +478,7 @@ registerSW({ immediate: true });
   try {
     await store.init();
     var got = await store.loadAll();
-    S.cfg = merge(DEF, got.cfg); S.months = got.months; db = true;
+    S.cfg = fixCfg(merge(DEF, got.cfg)); S.months = got.months; db = true;
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () { /* необязательно */ });
   } catch (e) { console.error(e); db = false; }
   start();
