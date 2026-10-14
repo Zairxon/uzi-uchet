@@ -438,23 +438,30 @@ function funnelView(S) {
   var tr = (+R.tour_start || 0); if (tr) h += '<p class="small muted">' + t('Подсказка при первом входе: началась {a}, пропустили {b}, дошли до конца {c}', { a: tr, b: +R.tour_skip || 0, c: +R.tour_done || 0 }) + '</p>';
   return h + '</div></section>';
 }
+// Строки отчёта «Откуда клиенты»: записи по источникам плюс входы по ссылкам меток (метка без записей тоже видна)
+function srcRows(S) {
+  var X = S.src || {}, V = (X.vis && X.vis.rows) || [], map = {}, out = [];
+  (X.rows || []).forEach(function (x) { var r = { src: x.src, campaign: x.campaign, channel: x.channel, total: +x.total, visited: +x.visited, noshow: +x.noshow, revenue: +x.revenue, visits: 0 }; map[x.src] = map[x.src] || []; map[x.src].push(r); out.push(r); });
+  V.forEach(function (q) { var a = map[q.src]; if (a && a.length) a[0].visits += +q.visits; else { var r = { src: q.src, campaign: q.camp, channel: 'site', total: 0, visited: 0, noshow: 0, revenue: 0, visits: +q.visits }; map[q.src] = [r]; out.push(r); } });
+  return out;
+}
 function srcView(S) {
   var X = S.src || { state: 'idle', rows: [], msg: '' };
   var h = '<section><h2>' + t('Откуда клиенты за {m}', { m: lc(S.M) }) + '</h2>';
   if (!S.sync.enabled || !S.sync.user) h += '<p class="empty">' + t('Войдите в «Настройки» (синхронизация), чтобы видеть данные Ресепшена.') + '</p>';
   else if (X.state === 'loading' || X.state === 'idle') h += '<p class="empty">' + t('Загрузка…') + '</p>';
   else if (X.state === 'error') h += '<p class="alert">' + esc(X.msg) + '</p>';
-  else if (!X.rows.length) h += '<p class="empty">' + t('Нет записей за этот месяц.') + '</p>';
+  else if (!srcRows(S).length) h += '<p class="empty">' + t('Нет записей и входов за этот месяц.') + '</p>';
   else {
-    var CH = { call: 'По звонку', walkin: 'Живая очередь', site: 'Сайт без метки', bot: 'Бот без метки' }, T = { total: 0, visited: 0, noshow: 0, revenue: 0 }, maxV = 1;
-    X.rows.forEach(function (x) { T.total += +x.total; T.visited += +x.visited; T.noshow += +x.noshow; T.revenue += +x.revenue; if (+x.visited > maxV) maxV = +x.visited; });
+    var rows = srcRows(S), CH = { call: 'По звонку', walkin: 'Живая очередь', site: 'Сайт без метки', bot: 'Бот без метки' }, T = { total: 0, visited: 0, noshow: 0, revenue: 0, vis: 0 }, maxV = 1;
+    rows.forEach(function (x) { T.total += +x.total; T.vis += +x.visits; T.visited += +x.visited; T.noshow += +x.noshow; T.revenue += +x.revenue; if (+x.visited > maxV) maxV = +x.visited; });
     var mine = {}; (S.cfg.utm || []).forEach(function (l) { mine[l.slug] = l; });
     var lbl = function (x) { if (CH[x.src]) return t(CH[x.src]); if (mine[x.src]) return esc(mine[x.src].name) + ' <span class="chip">' + t((UTM_TYPES.filter(function (q) { return q[0] === mine[x.src].type; })[0] || ['', 'Другое'])[1]) + '</span>'; var k = SRC_SOURCES.filter(function (s) { return s[0] === x.src; })[0]; return esc(k ? t(k[1]) : x.src) + (x.campaign ? ' <span class="small muted">· ' + esc(x.campaign) + '</span>' : '') + ' <span class="chip">' + t(x.channel === 'bot' ? 'Бот' : 'Сайт') + '</span>'; };
-    var top = X.rows.filter(function (x) { return +x.visited > 0; })[0];
+    var top = rows.filter(function (x) { return +x.visited > 0; })[0];
     if (top) h += '<p class="small"><b>' + t('Больше всего клиентов пришло из: {s}', { s: lbl(top) }) + '</b></p>';
-    h += '<div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Источник') + '</th><th class="r">' + t('Записей') + '</th><th class="r">' + t('Пришли') + '</th><th class="r">' + t('Не пришли') + '</th><th class="r">' + t('Выручка') + '</th></tr></thead><tbody>' + X.rows.map(function (x) {
-      return '<tr><td>' + lbl(x) + '<div class="bar" style="width:' + Math.round(+x.visited / maxV * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + x.total + '</td><td class="r num"><b>' + x.visited + '</b></td><td class="r num">' + x.noshow + '</td><td class="r num">' + fmt(+x.revenue) + '</td></tr>';
-    }).join('') + '</tbody><tfoot><tr><td><b>' + t('Итого') + '</b></td><td class="r num"><b>' + T.total + '</b></td><td class="r num"><b>' + T.visited + '</b></td><td class="r num"><b>' + T.noshow + '</b></td><td class="r num"><b>' + fmt(T.revenue) + '</b></td></tr></tfoot></table></div>';
+    h += '<div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Источник') + '</th><th class="r">' + t('Входов') + '</th><th class="r">' + t('Записей') + '</th><th class="r">' + t('Пришли') + '</th><th class="r">' + t('Не пришли') + '</th><th class="r">' + t('Выручка') + '</th></tr></thead><tbody>' + rows.map(function (x) {
+      return '<tr><td>' + lbl(x) + '<div class="bar" style="width:' + Math.round(+x.visited / maxV * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + (+x.visits || '–') + '</td><td class="r num">' + x.total + '</td><td class="r num"><b>' + x.visited + '</b></td><td class="r num">' + x.noshow + '</td><td class="r num">' + fmt(+x.revenue) + '</td></tr>';
+    }).join('') + '</tbody><tfoot><tr><td><b>' + t('Итого') + '</b></td><td class="r num"><b>' + T.vis + '</b></td><td class="r num"><b>' + T.total + '</b></td><td class="r num"><b>' + T.visited + '</b></td><td class="r num"><b>' + T.noshow + '</b></td><td class="r num"><b>' + fmt(T.revenue) + '</b></td></tr></tfoot></table></div>';
   }
   h += '</section>' + funnelView(S);
   return h;
