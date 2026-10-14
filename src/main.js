@@ -173,7 +173,7 @@ function openTab(id) {
 /* ---------- журнал Ресепшена и чеки ---------- */
 function loadAudit() {
   var A = S.audit || (S.audit = { state: 'idle', rows: [], msg: '' }); if (!sync.enabled || !S.sync.user) { A.state = 'idle'; render(); return Promise.resolve(); }
-  A.state = 'loading'; render();
+  A.open = true; A.state = 'loading'; render();
   return clinic.auditList(60).then(function (rows) { A.rows = rows; A.state = 'ok'; }).catch(function (e) { A.state = 'error'; A.msg = e && e.message ? e.message : String(e); }).then(function () { render(); });
 }
 function loadMissing() {
@@ -414,6 +414,7 @@ document.addEventListener('click', function (ev) {
   else if (act === 'ops-today') { S.opsDay = today(); dayRcLoad(); }
   else if (act === 'lock-toggle') { var was = isLocked(S.M); S.cfg.locked = S.cfg.locked || {}; if (was) delete S.cfg.locked[S.M]; else S.cfg.locked[S.M] = true; logAct({ k: was ? 'unlock' : 'lock', d: S.M + '-01' }); render(); toast(T(was ? 'Месяц открыт' : 'Месяц закрыт: записи за него менять нельзя')); }
   else if (act === 'audit-load') loadAudit();
+  else if (act === 'audit-hide') { if (S.audit) S.audit.open = false; render(); }
   else if (act === 'export-ops') exportOps();
   else if (act === 'export-year') exportYear();
   else if (act === 'print') window.print();

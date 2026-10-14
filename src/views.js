@@ -645,12 +645,12 @@ export function vSet(S) {
   var AUS = { booked: 'Записан', came: 'Пришёл', done: 'Оплачено', cancelled: 'Отменён', no_show: 'Не пришёл', blocked: 'Время закрыто' };
   var auv = function (k, x) { if (x == null || x === '') return '—'; if (k === 'status') return t(AUS[x] || x); if (k === 'finished_at' || k === 'room_at') return t('да'); if (k === 'starts_at') { try { return new Date(x).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(x); } } if (k === 'doctor_id') return t('другой врач'); return esc(String(x)); };
   var auHtml = '<section><h2>' + t('Журнал Ресепшена') + '</h2><div class="panel"><p class="small muted">' + t('Кто и что менял в записях: статусы, оплаты, возвраты, переносы, удаления. Виден только владельцу.') + '</p>' +
-    (AU.state === 'ok' ? (AU.rows.length ? '<ul class="list">' + AU.rows.map(function (e) {
+    (!AU.open ? '' : AU.state === 'ok' ? (AU.rows.length ? '<ul class="list">' + AU.rows.map(function (e) {
       var when = ''; try { when = new Date(e.at).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (x) { /* без времени */ }
       var what = e.act === 'insert' ? t('Создана запись') : e.act === 'delete' ? t('Удалена запись') : Object.keys(e.changes || {}).map(function (k) { var p = e.changes[k]; return t(AUC[k] || k) + ': ' + auv(k, p[0]) + ' → ' + auv(k, p[1]); }).join('; ');
       return '<li><div class="li-main"><b>' + esc(e.client || '—') + '</b><span class="small muted">' + esc(when) + ' · ' + esc(e.who || '') + '</span><span class="small">' + what + '</span></div></li>';
     }).join('') + '</ul>' : '<p class="empty">' + t('Изменений пока нет.') + '</p>') : AU.state === 'loading' ? '<p class="empty">' + t('Загрузка…') + '</p>' : AU.state === 'error' ? '<p class="alert">' + esc(AU.msg) + '</p>' : '') +
-    '<div class="row gaptop"><button type="button" class="btn ghost" data-act="audit-load">' + t(AU.state === 'ok' ? 'Обновить' : 'Показать журнал') + '</button></div></div></section>';
+    '<div class="row gaptop"><button type="button" class="btn ghost" data-act="audit-load">' + t(AU.open && AU.state === 'ok' ? 'Обновить' : 'Показать журнал') + '</button>' + (AU.open ? '<button type="button" class="btn ghost" data-act="audit-hide">' + t('Свернуть') + '</button>' : '') + '</div></div></section>';
   var dataHtml = syncBlock(S) + appsBlock() + logHtml + auHtml + wipeHtml +
     '<section><h2>' + t('Резервная копия') + '</h2><div class="panel">' +
     '<div class="row"><button class="btn" data-act="backup-save">' + t('Скачать резервную копию') + '</button><button class="btn ghost" data-act="backup-load">' + t('Загрузить из копии') + '</button></div>' +
