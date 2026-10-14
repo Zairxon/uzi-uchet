@@ -389,18 +389,7 @@ function utmView(S) {
     '<div class="fld"><span>' + t('Что это') + '</span><div class="seg four">' + UTM_TYPES.map(function (x) { return '<button type="button" data-act="utm-type" data-id="' + x[0] + '" aria-pressed="' + (D.type === x[0]) + '">' + t(x[1]) + '</button>'; }).join('') + '</div></div>' +
     '<label class="fld"><span>' + t('Заметка (необязательно)') + '</span><input type="text" data-utm="note" value="' + esc(D.note) + '" autocomplete="off" placeholder="' + esc(t('например: ссылка на страницу, телефон человека')) + '"></label>' +
     '<div class="row gaptop"><button type="button" class="btn" data-act="utm-add">' + t('Создать метку') + '</button></div></div></section>';
-  h += '<section><h2>' + t('Мои метки') + ' <span class="chip">' + list.length + '</span></h2>';
-  if (!list.length) return h + '<p class="empty">' + t('Меток пока нет. Создайте первую выше: ссылка появится здесь.') + '</p></section>';
-  var vis = function (l) { var n = 0; (((X.vis || {}).rows) || []).forEach(function (q) { if (q.src === l.slug) n += +q.visits; }); return n; };
-  var bk = function (l) { var s = { total: 0, visited: 0, revenue: 0 }; (X.rows || []).forEach(function (x) { if (x.src === l.slug) { s.total += +x.total; s.visited += +x.visited; s.revenue += +x.revenue; } }); return s; };
-  var ready = X.state === 'ok';
-  h += '<div class="panel"><div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Метка') + '</th><th class="r">' + t('Входов') + '</th><th class="r">' + t('Записей') + '</th><th class="r">' + t('Пришли') + '</th><th class="r">' + t('Выручка') + '</th><th></th></tr></thead><tbody>' + list.map(function (l) {
-    var lk = utmLinks(l), s = bk(l), nv = X.vis ? vis(l) : null;
-    return '<tr><td><b>' + esc(l.name) + '</b><div class="small muted"><span class="chip">' + typeName(l.type) + '</span> ' + esc(l.slug) + (l.note ? ' · ' + esc(l.note) : '') + '</div>' +
-      '<div class="row gaptop"><button type="button" class="btn ghost small" data-act="utm-copy" data-url="' + esc(lk.web) + '">' + t('Копировать ссылку «Навбата»') + '</button><button type="button" class="btn ghost small" data-act="utm-copy" data-url="' + esc(lk.bot) + '">' + t('Копировать ссылку бота') + '</button></div></td>' +
-      '<td class="r num"><b>' + (nv == null ? '–' : nv) + '</b></td><td class="r num">' + (ready ? s.total : '–') + '</td><td class="r num">' + (ready ? s.visited : '–') + '</td><td class="r num">' + (ready ? fmt(s.revenue) : '–') + '</td><td>' + delBtn(S, 'del-utm', l.id) + '</td></tr>';
-  }).join('') + '</tbody></table></div><p class="small muted">' + t('Входов — сколько раз открыли «Навбат» или бота по ссылке метки, остальное — за выбранный месяц. Подробности по источникам смотрите ниже в отчёте «Откуда клиенты».') + '</p></div>';
-  return h + '</section>';
+  return h;
 }
 // Воронка записи: сколько посетителей сайта дошло до каждого шага
 var FUN = [['open', 'Открыли сайт'], ['day', 'Выбрали день'], ['doctor', 'Выбрали врача'], ['time', 'Выбрали время'], ['service', 'Выбрали услугу'], ['form', 'Начали вводить имя и телефон'], ['book_click', 'Нажали «Записаться»'], ['held', 'Время удержано (ждём чек)'], ['pay_view', 'Открыли экран оплаты'], ['receipt_pick', 'Выбрали фото чека'], ['receipt_sent', 'Отправили чек']];
@@ -425,6 +414,7 @@ function srcRows(S) {
   var X = S.src || {}, V = (X.vis && X.vis.rows) || [], map = {}, out = [];
   (X.rows || []).forEach(function (x) { var r = { src: x.src, campaign: x.campaign, channel: x.channel, total: +x.total, visited: +x.visited, noshow: +x.noshow, revenue: +x.revenue, visits: 0 }; map[x.src] = map[x.src] || []; map[x.src].push(r); out.push(r); });
   V.forEach(function (q) { var a = map[q.src]; if (a && a.length) a[0].visits += +q.visits; else { var r = { src: q.src, campaign: q.camp, channel: 'site', total: 0, visited: 0, noshow: 0, revenue: 0, visits: +q.visits }; map[q.src] = [r]; out.push(r); } });
+  (S.cfg.utm || []).forEach(function (l) { if (!map[l.slug]) { var r = { src: l.slug, campaign: '', channel: 'site', total: 0, visited: 0, noshow: 0, revenue: 0, visits: 0 }; map[l.slug] = [r]; out.push(r); } });
   return out;
 }
 function srcView(S) {
@@ -439,11 +429,13 @@ function srcView(S) {
     rows.forEach(function (x) { T.total += +x.total; T.vis += +x.visits; T.visited += +x.visited; T.noshow += +x.noshow; T.revenue += +x.revenue; if (+x.visited > maxV) maxV = +x.visited; });
     var mine = {}; (S.cfg.utm || []).forEach(function (l) { mine[l.slug] = l; });
     var lbl = function (x) { if (CH[x.src]) return t(CH[x.src]); if (mine[x.src]) return esc(mine[x.src].name) + ' <span class="chip">' + t((UTM_TYPES.filter(function (q) { return q[0] === mine[x.src].type; })[0] || ['', 'Другое'])[1]) + '</span>'; var k = SRC_SOURCES.filter(function (s) { return s[0] === x.src; })[0]; return esc(k ? t(k[1]) : x.src) + (x.campaign ? ' <span class="small muted">· ' + esc(x.campaign) + '</span>' : '') + ' <span class="chip">' + t(x.channel === 'bot' ? 'Бот' : 'Сайт') + '</span>'; };
+    // у своих меток под названием: заметка и кнопки копирования ссылок, чтобы не искать их в другом месте
+    var own = function (x) { var l = mine[x.src]; if (!l) return ''; var lk = utmLinks(l); return '<div class="small muted">' + esc(l.slug) + (l.note ? ' · ' + esc(l.note) : '') + '</div><div class="row gaptop"><button type="button" class="btn ghost small" data-act="utm-copy" data-url="' + esc(lk.web) + '">' + t('Копировать ссылку «Навбата»') + '</button><button type="button" class="btn ghost small" data-act="utm-copy" data-url="' + esc(lk.bot) + '">' + t('Копировать ссылку бота') + '</button></div>'; };
     var top = rows.filter(function (x) { return +x.visited > 0; })[0];
     if (top) h += '<p class="small"><b>' + t('Больше всего клиентов пришло из: {s}', { s: lbl(top) }) + '</b></p>';
-    h += '<div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Источник') + '</th><th class="r">' + t('Входов') + '</th><th class="r">' + t('Записей') + '</th><th class="r">' + t('Пришли') + '</th><th class="r">' + t('Не пришли') + '</th><th class="r">' + t('Выручка') + '</th></tr></thead><tbody>' + rows.map(function (x) {
-      return '<tr><td>' + lbl(x) + '<div class="bar" style="width:' + Math.round(+x.visited / maxV * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + (+x.visits || '–') + '</td><td class="r num">' + x.total + '</td><td class="r num"><b>' + x.visited + '</b></td><td class="r num">' + x.noshow + '</td><td class="r num">' + fmt(+x.revenue) + '</td></tr>';
-    }).join('') + '</tbody><tfoot><tr><td><b>' + t('Итого') + '</b></td><td class="r num"><b>' + T.vis + '</b></td><td class="r num"><b>' + T.total + '</b></td><td class="r num"><b>' + T.visited + '</b></td><td class="r num"><b>' + T.noshow + '</b></td><td class="r num"><b>' + fmt(T.revenue) + '</b></td></tr></tfoot></table></div>';
+    h += '<div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Источник') + '</th><th class="r">' + t('Входов') + '</th><th class="r">' + t('Записей') + '</th><th class="r">' + t('Пришли') + '</th><th class="r">' + t('Не пришли') + '</th><th class="r">' + t('Выручка') + '</th><th></th></tr></thead><tbody>' + rows.map(function (x) {
+      return '<tr><td>' + lbl(x) + own(x) + '<div class="bar" style="width:' + Math.round(+x.visited / maxV * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + (+x.visits || '–') + '</td><td class="r num">' + x.total + '</td><td class="r num"><b>' + x.visited + '</b></td><td class="r num">' + x.noshow + '</td><td class="r num">' + fmt(+x.revenue) + '</td><td>' + (mine[x.src] ? delBtn(S, 'del-utm', mine[x.src].id) : '') + '</td></tr>';
+    }).join('') + '</tbody><tfoot><tr><td><b>' + t('Итого') + '</b></td><td class="r num"><b>' + T.vis + '</b></td><td class="r num"><b>' + T.total + '</b></td><td class="r num"><b>' + T.visited + '</b></td><td class="r num"><b>' + T.noshow + '</b></td><td class="r num"><b>' + fmt(T.revenue) + '</b></td><td></td></tr></tfoot></table></div>';
   }
   return h + '<div class="row gaptop"><button type="button" class="btn" data-act="utm-form">' + t(S.utmOpen ? 'Скрыть форму метки' : '＋ Добавить метку') + '</button></div></section>';
 }
