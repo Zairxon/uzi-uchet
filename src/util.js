@@ -1,7 +1,7 @@
 import { months } from './i18n.js';
 
 export const DEF = {
-  tax: { regime: 'turnover', turnover: 4, profit: 15, ndfl: 12, inps: 0.1, soc: 12 },
+  tax: { regime: 'turnover', turnover: 4, profit: 15, ndfl: 12, inps: 0.1, soc: 12, lossYears: 5, lossLimit: 50 },
   staff: [],
   locked: {},
   log: [],

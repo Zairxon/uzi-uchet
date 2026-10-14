@@ -167,16 +167,16 @@ describe('compareTax: сравнение режимов', () => {
     '2026-01': { ops: [op('2026-01-05', 'income', 'usl', 100000000), op('2026-01-06', 'expense', 'supplies', 60000000)] },
     '2026-02': { ops: [op('2026-02-05', 'income', 'usl', 10000000), op('2026-02-06', 'expense', 'supplies', 30000000)] },
   };
-  it('оборот = выручка × 4%, прибыль = max(0, прибыль до налога) × 15% по каждому месяцу', async () => {
+  it('оборот = выручка × 4%, прибыль — нарастающим итогом за год × 15%', async () => {
     const { compareTax } = await import('../src/calc.js');
     const cfg = cfgOf();
     const C = compute(cfg, months, '2026-02');
     const K = compareTax(cfg, C.rows, '2026-02');
     expect(K.month.turnover).toBeCloseTo(400000, 6);
-    expect(K.month.profit).toBe(0);
+    expect(K.month.profit).toBeCloseTo(-3000000, 6); // убыточный февраль уменьшает налог, начисленный за январь
     expect(K.ytd.rev).toBe(110000000);
     expect(K.ytd.turnover).toBeCloseTo(4400000, 6);
-    expect(K.ytd.profit).toBeCloseTo(6000000, 6);
+    expect(K.ytd.profit).toBeCloseTo(3000000, 6); // (40 − 20) млн × 15%
   });
   it('согласуется с compute для выбранного режима', async () => {
     const { compareTax } = await import('../src/calc.js');
@@ -186,5 +186,40 @@ describe('compareTax: сравнение режимов', () => {
       const K = compareTax(cfg, C.rows, '2026-02');
       expect(K.ytd[regime]).toBeCloseTo(ytd(C.rows, '2026-02').tax, 6);
     }
+  });
+});
+
+describe('налог на прибыль: нарастающий итог и перенос убытка', () => {
+  const cfgP = (extra) => cfgOf({ tax: { regime: 'profit', ...(extra || {}) } });
+  const mo = (m, inc, exp) => ({ ops: [op(m + '-05', 'income', 'usl', inc), op(m + '-06', 'expense', 'supplies', exp)] });
+  it('убыток внутри года гасит прибыль того же года', () => {
+    const months = { '2026-01': mo('2026-01', 100e6, 60e6), '2026-02': mo('2026-02', 10e6, 30e6) };
+    expect(compute(cfgP(), months, '2026-01').cur.tax).toBeCloseTo(6e6, 6);
+    expect(compute(cfgP(), months, '2026-02').cur.tax).toBeCloseTo(-3e6, 6);
+    expect(ytd(compute(cfgP(), months, '2026-02').rows, '2026-02').tax).toBeCloseTo(3e6, 6);
+  });
+  it('убыток прошлого года уменьшает налог, но не больше заданной доли прибыли', () => {
+    const months = { '2025-06': mo('2025-06', 0, 100e6), '2026-03': mo('2026-03', 100e6, 60e6) };
+    // прибыль 40 млн, убыток 100 млн покрывает не более 50% = 20 млн → база 20 млн
+    expect(compute(cfgP({ lossLimit: 50 }), months, '2026-03').cur.tax).toBeCloseTo(3e6, 6);
+    expect(compute(cfgP({ lossLimit: 100 }), months, '2026-03').cur.tax).toBeCloseTo(0, 6);
+    expect(compute(cfgP({ lossLimit: 0 }), months, '2026-03').cur.tax).toBeCloseTo(6e6, 6);
+  });
+  it('убыток действует только заданное число лет', () => {
+    const months = { '2024-06': mo('2024-06', 0, 100e6), '2026-03': mo('2026-03', 100e6, 60e6) };
+    expect(compute(cfgP({ lossYears: 2, lossLimit: 100 }), months, '2026-03').cur.tax).toBeCloseTo(0, 6);
+    expect(compute(cfgP({ lossYears: 1, lossLimit: 100 }), months, '2026-03').cur.tax).toBeCloseTo(6e6, 6);
+  });
+  it('использованный убыток не учитывается повторно в следующем году', () => {
+    const months = { '2025-06': mo('2025-06', 0, 30e6), '2026-03': mo('2026-03', 100e6, 60e6), '2027-03': mo('2027-03', 100e6, 60e6) };
+    const cfg = cfgP({ lossLimit: 100 });
+    expect(compute(cfg, months, '2026-03').cur.tax).toBeCloseTo(1.5e6, 6); // (40 − 30) × 15%
+    expect(compute(cfg, months, '2027-03').cur.tax).toBeCloseTo(6e6, 6); // убыток уже израсходован
+  });
+  it('compareTax показывает остаток убытка прошлых лет', async () => {
+    const { compareTax } = await import('../src/calc.js');
+    const months = { '2025-06': mo('2025-06', 0, 100e6), '2026-03': mo('2026-03', 100e6, 60e6) };
+    const cfg = cfgP({ lossLimit: 50 }), C = compute(cfg, months, '2026-03');
+    expect(compareTax(cfg, C.rows, '2026-03').loss).toBeCloseTo(100e6, 0);
   });
 });

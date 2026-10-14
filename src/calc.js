@@ -23,6 +23,27 @@ export function payCalc(staff, tax) {
   r.soc = r.gross * t.soc / 100; return r;
 }
 
+// Налог на прибыль нарастающим итогом за год с переносом убытка прошлых лет.
+// За месяц: налог на накопленную с начала года прибыль минус уже начисленное (в месяце после убыточного налог может уменьшиться).
+// Убыток года, закончившегося убытком, можно учесть в следующие lossYears лет, но не более lossLimit % налоговой базы года.
+export function ptState() { return { year: 0, cum: 0, taxed: 0, use: 0, losses: [] }; }
+function ptAvail(S, y, yrs) { var a = 0; S.losses.forEach(function (l) { if (y > l.y && y - l.y <= yrs) a += l.left; }); return a; }
+export function ptMonth(S, tax, m, pre) {
+  var y = +m.slice(0, 4); if (S.year !== y) { S.year = y; S.cum = 0; S.taxed = 0; S.use = 0; }
+  S.cum += pre;
+  var yrs = tax.lossYears == null ? 5 : tax.lossYears, lim = (tax.lossLimit == null ? 50 : tax.lossLimit) / 100, base = Math.max(0, S.cum);
+  S.use = Math.min(ptAvail(S, y, yrs), base * lim);
+  var due = (base - S.use) * tax.profit / 100, out = due - S.taxed; S.taxed = due;
+  if (m.slice(5, 7) === '12') ptClose(S, y, yrs);
+  return out;
+}
+// конец года: убыток уходит в запас, прибыль гасит самые старые убытки
+function ptClose(S, y, yrs) {
+  if (S.cum < 0) S.losses.push({ y: y, left: -S.cum });
+  else { var need = S.use; S.losses.slice().sort(function (a, b) { return a.y - b.y; }).forEach(function (l) { if (y > l.y && y - l.y <= yrs && need > 0) { var t = Math.min(l.left, need); l.left -= t; need -= t; } }); }
+  S.use = 0;
+}
+
 export function blank(m) {
   return {
     m: m, rev: 0, opex: {}, opexSum: 0, payroll: 0, rent: 0, int: 0, dep: 0, preTax: 0, tax: 0, net: 0, open: 0, close: 0,
@@ -37,7 +58,7 @@ export function compute(cfg, months, upto) {
   var first = starts[0] || upto, rows = [], intBy = {}; sched(cfg.loan).forEach(function (r) { intBy[r.m] = r.int; });
   var B = { cash: 0, bank: 0, fa: 0, dep: 0, loan: 0, contrib: 0, div: 0, profit: 0, pay: { wage: 0, rent: 0, int: 0, tax: 0 } };
   var eq = []; Object.keys(months).forEach(function (mm) { ((months[mm] && months[mm].ops) || []).forEach(function (o) { if (o.t === 'expense' && o.c === 'equip') eq.push({ m: ymOf(o.d) || mm, cost: o.a || 0, life: 60 }); }); });
-  var loanM = cfg.loan.amount ? ymOf(cfg.loan.start) : '', rentM = ymOf(cfg.rent.start), guard = 0;
+  var loanM = cfg.loan.amount ? ymOf(cfg.loan.start) : '', rentM = ymOf(cfg.rent.start), guard = 0, PT = ptState();
   for (var m = first; m <= upto && guard < 720; m = addM(m, 1), guard++) {
     var r = blank(m); r.open = B.cash + B.bank;
     ((months[m] && months[m].ops) || []).forEach(function (o) {
@@ -66,7 +87,7 @@ export function compute(cfg, months, upto) {
     if (rentM && m >= rentM && cfg.rent.amount) { r.rent = cfg.rent.amount; B.pay.rent += r.rent; }
     if (intBy[m]) { r.int = intBy[m]; B.pay.int += r.int; }
     r.preTax = r.rev - r.opexSum - r.payroll - r.rent - r.int - r.dep;
-    r.tax = cfg.tax.regime === 'profit' ? Math.max(0, r.preTax) * cfg.tax.profit / 100 : r.rev * cfg.tax.turnover / 100;
+    r.tax = cfg.tax.regime === 'profit' ? ptMonth(PT, cfg.tax, m, r.preTax) : r.rev * cfg.tax.turnover / 100;
     B.pay.tax += r.tax; r.net = r.preTax - r.tax; B.profit += r.net; B.dep += r.dep; r.close = B.cash + B.bank; rows.push(r);
   }
   var cur = rows.length && rows[rows.length - 1].m === upto ? rows[rows.length - 1] : blank(upto);
@@ -94,17 +115,15 @@ export function balance(B) {
 // Налог с оборота = выручка × ставка, налог на прибыль = max(0, прибыль до налога) × ставка.
 export var TURNOVER_LIMIT = 1000000000;
 export function compareTax(cfg, rows, upto) {
-  var y = upto.slice(0, 4);
+  var y = upto.slice(0, 4), PT = ptState(), pm = {};
+  rows.slice().sort(function (a, b) { return a.m < b.m ? -1 : a.m > b.m ? 1 : 0; }).forEach(function (r) { if (r.m <= upto) pm[r.m] = ptMonth(PT, cfg.tax, r.m, r.preTax); });
   function sum(list) {
     var s = { rev: 0, preTax: 0, turnover: 0, profit: 0 };
-    list.forEach(function (r) {
-      s.rev += r.rev; s.preTax += r.preTax;
-      s.turnover += r.rev * cfg.tax.turnover / 100;
-      s.profit += Math.max(0, r.preTax) * cfg.tax.profit / 100;
-    });
+    list.forEach(function (r) { s.rev += r.rev; s.preTax += r.preTax; s.turnover += r.rev * cfg.tax.turnover / 100; s.profit += pm[r.m] || 0; });
     return s;
   }
   var month = sum(rows.filter(function (r) { return r.m === upto; }));
   var year = sum(rows.filter(function (r) { return r.m.slice(0, 4) === y && r.m <= upto; }));
-  return { month: month, ytd: year, limit: TURNOVER_LIMIT };
+  var yrs = cfg.tax.lossYears == null ? 5 : cfg.tax.lossYears;
+  return { month: month, ytd: year, limit: TURNOVER_LIMIT, loss: ptAvail(PT, +y, yrs) };
 }
