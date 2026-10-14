@@ -6,6 +6,7 @@ export const DEF = {
   tax: { regime: 'turnover', turnover: 4, profit: 15, vat: 12, social: true, ndfl: 12, inps: 0.1, soc: 12, lossYears: 100, lossLimit: 100 },
   staff: [],
   locked: {},
+  utm: [],
   log: [],
   cardFirm: false,
   assets: [],

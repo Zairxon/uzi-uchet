@@ -476,3 +476,11 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .chip.bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
 .chip.ok{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
 .todo .li-main b{font-weight:600}
+
+/* QR-коды рекламных ссылок */
+.qrbox{display:flex;gap:14px;align-items:center;margin:4px 0 14px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.qrbox img{border-radius:8px;background:#fff;flex:0 0 auto}
+.qrside{display:flex;flex-direction:column;gap:6px;align-items:flex-start;min-width:0}
+.qrside .btn{text-decoration:none}
+
+.utmcard .uh{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}

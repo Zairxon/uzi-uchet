@@ -23,7 +23,7 @@ import { t as T, getLang, setLang, brand } from './i18n.js';
 import { mountFooter } from './footer.js';
 import { parseDate, maskDate, openCal, closeCal, fmtDate } from './datepicker.js';
 import { openSelect, closeSelect, askConfirm } from './ui.js';
-import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff, srcLinksHtml } from './views.js';
+import { TABS, CATS, vHome, vOps, vPay, vLoan, vRep, vSet, getP, setP, staffEff, utmSlug } from './views.js';
 import { DEF, addM, clone, merge, mName, num, today, uid, ymOf } from './util.js';
 window.__appReady = true;
 
@@ -213,8 +213,18 @@ function wipe(id) {
   });
 }
 
+/* ---------- метки (УТМ) ---------- */
+var UTM_PRE = [['Инстаграм', 'social'], ['Телеграм', 'social'], ['Фейсбук', 'social'], ['Ютуб', 'social'], ['Тикток', 'social'], ['Гугл', 'site'], ['Яндекс', 'site'], ['2ГИС', 'site']];
+function utmDraft() { if (!S.utmD) S.utmD = { name: '', type: 'social', note: '' }; return S.utmD; }
+function utmAdd() {
+  var d = utmDraft(), name = (d.name || '').trim(); if (name.length < 2) { toast(T('Введите название метки')); return; }
+  var base = utmSlug(name) || 'metka', slug = base, n = 2, list = S.cfg.utm || [];
+  while (list.some(function (l) { return l.slug === slug; })) { slug = base.slice(0, 26) + n; n++; }
+  list.unshift({ id: uid(), name: name, type: d.type || 'other', slug: slug, note: (d.note || '').trim(), created: today() });
+  S.cfg.utm = list; S.utmD = { name: '', type: d.type || 'social', note: '' }; S.utmQr = list[0].id; logAct({ k: 'utmadd', d: today() }); saveCfg(); toast(T('Метка создана: ссылка и QR-код готовы'));
+}
 /* ---------- источники клиентов ---------- */
-function srcState() { if (!S.src) S.src = { state: 'idle', rows: [], msg: '', u: { source: 'instagram', custom: '', medium: 'bio', campaign: '' } }; return S.src; }
+function srcState() { if (!S.src) S.src = { state: 'idle', rows: [], msg: '' }; return S.src; }
 function loadSrc() {
   var X = srcState(); if (!sync.enabled || !S.sync.user) { X.state = 'idle'; render(); return Promise.resolve(); }
   X.state = 'loading'; render(); var r = clinic.monthRange(S.M);
@@ -369,21 +379,24 @@ document.addEventListener('click', function (ev) {
   if (act.indexOf('del-') === 0) {
     if (S.armed !== act + id) { S.armed = act + id; render(); return; } S.armed = null;
     if (act === 'del-op') { var lockedHit = false; Object.keys(S.months).forEach(function (mk) { var dm = S.months[mk]; if (dm && dm.ops && dm.ops.some(function (o) { return o.id === id; })) { if (isLocked(mk)) { lockedHit = true; return; } var gone = dm.ops.filter(function (o) { return o.id === id; })[0]; dm.ops = dm.ops.filter(function (o) { return o.id !== id; }); writeMonth(mk); logAct({ k: 'del', c: gone.c, a: gone.a, d: gone.d }); } }); if (lockedHit) toast(T(LOCK_MSG)); render(); }
+    else if (act === 'del-utm') { S.cfg.utm = (S.cfg.utm || []).filter(function (l) { return l.id !== id; }); logAct({ k: 'utmdel', d: today() }); saveCfg(); }
     else if (act === 'del-staff') { S.cfg.staff = S.cfg.staff.filter(function (s) { return s.id !== id; }); saveCfg(); }
     else if (act === 'del-asset') { S.cfg.assets = S.cfg.assets.filter(function (a) { return a.id !== id; }); saveCfg(); }
     return;
   }
   S.armed = null;
-  if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); if (id === 'src') loadSrc(); }
-  else if (act === 'src-pick') { srcState().u.source = id; render(); }
-  else if (act === 'src-medium') { srcState().u.medium = id; render(); }
+  if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); if (id === 'src' || id === 'utm') loadSrc(); }
+  else if (act === 'utm-type') { utmDraft().type = id; render(); }
+  else if (act === 'utm-preset') { var pr = UTM_PRE[+id]; if (pr) { var dd = utmDraft(); dd.name = pr[0]; dd.type = pr[1]; render(); } }
+  else if (act === 'utm-qr') { S.utmQr = S.utmQr === id ? '' : id; render(); }
+  else if (act === 'utm-add') utmAdd();
   else if (act === 'src-copy') { var inp = document.getElementById(id); if (inp) { inp.select(); try { navigator.clipboard.writeText(inp.value); } catch (e) { document.execCommand('copy'); } b.textContent = T('Скопировано'); } }
   else if (act === 'lang-set') { setLang(id); document.getElementById('langmenu').hidden = true; render(); }
   else if (act === 'lang-menu') { var lm = document.getElementById('langmenu'); lm.hidden = !lm.hidden; }
   else if (act === 'theme-flip') { var nx = effDark() ? 'light' : 'dark'; try { localStorage.setItem('uzi-theme', nx); } catch (e) { /* не страшно */ } applyTheme(nx); render(); }
   else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
-  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); rcSync(S.M); }
-  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); rcSync(S.M); }
+  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && (S.repView === 'src' || S.repView === 'utm')) loadSrc(); rcSync(S.M); }
+  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && (S.repView === 'src' || S.repView === 'utm')) loadSrc(); rcSync(S.M); }
   else if (act === 'tab') openTab(id);
   else if (act === 'ops-prev') { S.opsDay = addDays(S.opsDay, -1); dayRcLoad(); }
   else if (act === 'ops-next') { S.opsDay = addDays(S.opsDay, 1); dayRcLoad(); }
@@ -427,7 +440,7 @@ document.addEventListener('input', function (ev) {
   }
   if (el.dataset.iph !== undefined && S.info.s) { var pd = ev.inputType && ev.inputType.indexOf('delete') === 0; el.value = fmtPhoneInput(el.value, pd); S.info.s.ph[+el.dataset.iph] = el.value; }
   if (el.dataset.idoc && S.info.d.length) { var pr = el.dataset.idoc.split(':'); S.info.d[+pr[0]][pr[1]] = el.value; }
-  if (el.dataset.src) { var X2 = srcState(); X2.u[el.dataset.src] = el.value; var lk = document.getElementById('src-links'); if (lk) lk.innerHTML = srcLinksHtml(X2.u); }
+  if (el.dataset.utm) utmDraft()[el.dataset.utm] = el.value;
   if (el.id === 'sync-email') S.sync.email = el.value;
   if (el.id === 'sync-pass') S.sync.pass = el.value;
 });

@@ -1,5 +1,6 @@
 // Шесть вкладок. Разметка перенесена из прототипа без изменений; тексты идут через t() (русский / узбекский).
 // Состояние приходит в объекте S: { cfg, months, M, draft, armed, sync }.
+import qrcode from 'qrcode-generator';
 import { sched, payCalc, blank, ytd, compareTax, generalTax, compute } from './calc.js';
 import { addM, mName, ymOf, fmt, fmtM, esc, today } from './util.js';
 import { t, months, getLang } from './i18n.js';
@@ -367,20 +368,55 @@ export function vLoan(S) {
 
 // Источники клиентов: таблица за месяц и создание рекламных ссылок с меткой
 var SRC_SOURCES = [['instagram', 'Инстаграм'], ['telegram', 'Телеграм'], ['facebook', 'Фейсбук'], ['google', 'Гугл'], ['yandex', 'Яндекс'], ['2gis', '2ГИС'], ['flyer', 'Листовка'], ['barcode', 'Штрих-код'], ['other', 'Другое']];
-var SRC_MEDIA = [['bio', 'Профиль'], ['post', 'Публикация'], ['stories', 'Истории'], ['ads', 'Реклама'], ['barcode', 'Штрих-код'], ['sms', 'СМС']];
 export function srcSlug(s) { return cyr2lat(String(s || '')).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40); }
-export function srcLinks(u) {
-  var src = u.source === 'other' ? srcSlug(u.custom) : u.source, med = u.medium || '', cmp = srcSlug(u.campaign);
-  if (!src) return null;
-  var q = 'utm_source=' + encodeURIComponent(src) + (med ? '&utm_medium=' + encodeURIComponent(med) : '') + (cmp ? '&utm_campaign=' + encodeURIComponent(cmp) : '');
-  return { web: APP_LINKS.queue + '?' + q, bot: BOT_URL + '?start=u_' + [src, med, cmp].join('-').replace(/-+$/, '') };
+// QR-код ссылки: рисуется на холсте в PNG, чтобы его можно было скачать и напечатать
+function qrDataUrl(text) {
+  try {
+    var q = qrcode(0, 'M'); q.addData(text); q.make();
+    var n = q.getModuleCount(), mg = 4, sc = Math.max(4, Math.floor(900 / (n + 2 * mg))), size = (n + 2 * mg) * sc, c = document.createElement('canvas');
+    c.width = c.height = size; var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size); g.fillStyle = '#000';
+    for (var r = 0; r < n; r++) for (var k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect((k + mg) * sc, (r + mg) * sc, sc, sc);
+    return c.toDataURL('image/png');
+  } catch (e) { return ''; }
 }
-function srcLinksHtml(u) {
-  var l = srcLinks(u); if (!l) return '<p class="small muted">' + t('Введите название источника.') + '</p>';
+// «УТМ-отдел»: свои метки. Приложение само создаёт ссылку и QR-код, считает записи и выручку по каждой метке.
+var UTM_TYPES = [['social', 'Соцсеть'], ['site', 'Сайт'], ['person', 'Человек'], ['print', 'Листовка или QR'], ['other', 'Другое']];
+var UTM_PRESETS = [['Инстаграм', 'social'], ['Телеграм', 'social'], ['Фейсбук', 'social'], ['Ютуб', 'social'], ['Тикток', 'social'], ['Гугл', 'site'], ['Яндекс', 'site'], ['2ГИС', 'site']];
+export function utmSlug(name) { return cyr2lat(String(name || '')).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30); }
+export function utmLinks(l) {
+  return { web: APP_LINKS.queue + '?utm_source=' + encodeURIComponent(l.slug) + '&utm_medium=' + encodeURIComponent(l.type), bot: BOT_URL + '?start=u_' + l.slug + '-' + l.type };
+}
+function utmView(S) {
+  var list = S.cfg.utm || [], D = S.utmD || { name: '', type: 'social', note: '' }, X = S.src || { state: 'idle', rows: [] };
+  var typeName = function (k) { var x = UTM_TYPES.filter(function (q) { return q[0] === k; })[0]; return x ? t(x[1]) : k; };
+  var stat = function (l) {
+    if (X.state !== 'ok') return '';
+    var s = { total: 0, visited: 0, revenue: 0 }; X.rows.forEach(function (x) { if (x.src === l.slug) { s.total += +x.total; s.visited += +x.visited; s.revenue += +x.revenue; } });
+    return '<p class="small">' + t('За {m}: записей {a}, пришли {b}, выручка {c} сум', { m: lc(S.M), a: s.total, b: s.visited, c: fmt(s.revenue) }) + '</p>';
+  };
   var row = function (label, url, id) { return '<div class="fld"><span>' + t(label) + '</span><div class="row"><input type="text" readonly value="' + esc(url) + '" id="' + id + '" style="font-size:12px"><button type="button" class="btn ghost" data-act="src-copy" data-id="' + id + '">' + t('Копировать') + '</button></div></div>'; };
-  return row('Ссылка на «Навбат»', l.web, 'src-web') + row('Ссылка на бота', l.bot, 'src-bot');
+  var h = '<section><h2>' + t('Метки (УТМ)') + '</h2><p class="small muted">' + t('Создайте метку для каждого места или человека, где будет стоять ваша ссылка: страница в соцсети, сайт, блогер, листовка. Приложение само сделает ссылку и QR-код, а когда клиенты запишутся по ним, здесь будет видно, сколько записей и денег принесла каждая метка.') + '</p></section>';
+  h += '<section><h2>' + t('Новая метка') + '</h2><div class="panel">' +
+    '<div class="fld"><span>' + t('Быстро выбрать') + '</span><div class="pills">' + UTM_PRESETS.map(function (p, k) { return '<button type="button" class="pill" data-act="utm-preset" data-id="' + k + '">' + t(p[0]) + '</button>'; }).join('') + '</div></div>' +
+    '<label class="fld"><span>' + t('Название метки') + '</span><input type="text" data-utm="name" value="' + esc(D.name) + '" autocomplete="off" placeholder="' + esc(t('например: Мадина Каримова или Инстаграм клиники')) + '"></label>' +
+    '<div class="fld"><span>' + t('Что это') + '</span><div class="seg four">' + UTM_TYPES.map(function (x) { return '<button type="button" data-act="utm-type" data-id="' + x[0] + '" aria-pressed="' + (D.type === x[0]) + '">' + t(x[1]) + '</button>'; }).join('') + '</div></div>' +
+    '<label class="fld"><span>' + t('Заметка (необязательно)') + '</span><input type="text" data-utm="note" value="' + esc(D.note) + '" autocomplete="off" placeholder="' + esc(t('например: ссылка на страницу, телефон человека')) + '"></label>' +
+    '<div class="row gaptop"><button type="button" class="btn" data-act="utm-add">' + t('Создать метку') + '</button></div></div></section>';
+  h += '<section><h2>' + t('Мои метки') + ' <span class="chip">' + list.length + '</span></h2>';
+  if (!list.length) h += '<p class="empty">' + t('Меток пока нет. Создайте первую выше: ссылка и QR-код появятся здесь.') + '</p>';
+  list.forEach(function (l) {
+    var lk = utmLinks(l), open = S.utmQr === l.id;
+    h += '<div class="panel utmcard"><div class="uh"><div class="li-main"><b>' + esc(l.name) + '</b><span class="small muted"><span class="chip">' + typeName(l.type) + '</span> · ' + esc(l.slug) + (l.note ? ' · ' + esc(l.note) : '') + '</span></div>' + delBtn(S, 'del-utm', l.id) + '</div>' + stat(l) +
+      row('Ссылка на «Навбат»', lk.web, 'utm-web-' + l.id) + row('Ссылка на бота', lk.bot, 'utm-bot-' + l.id) +
+      '<div class="row"><button type="button" class="btn ghost" data-act="utm-qr" data-id="' + esc(l.id) + '" aria-expanded="' + open + '">' + t(open ? 'Скрыть QR-коды' : 'Показать QR-коды') + '</button></div>' +
+      (open ? qrBlock('QR-код для «Навбата»', lk.web, 'navbat-' + l.slug) + qrBlock('QR-код для бота', lk.bot, 'bot-' + l.slug) : '') + '</div>';
+  });
+  return h + '</section>';
 }
-export { srcLinksHtml };
+function qrBlock(label, url, name) {
+  var d = qrDataUrl(url); if (!d) return '';
+  return '<div class="qrbox"><img src="' + d + '" alt="QR" width="168" height="168"><div class="qrside"><b>' + t(label) + '</b><span class="small muted">' + t('Наведите камеру телефона: откроется ссылка с меткой.') + '</span><a class="btn" download="' + esc(name) + '.png" href="' + d + '">' + t('Скачать QR (PNG)') + '</a></div></div>';
+}
 // Воронка записи: сколько посетителей сайта дошло до каждого шага
 var FUN = [['open', 'Открыли сайт'], ['day', 'Выбрали день'], ['doctor', 'Выбрали врача'], ['time', 'Выбрали время'], ['service', 'Выбрали услугу'], ['form', 'Начали вводить имя и телефон'], ['book_click', 'Нажали «Записаться»'], ['held', 'Время удержано (ждём чек)'], ['pay_view', 'Открыли экран оплаты'], ['receipt_pick', 'Выбрали фото чека'], ['receipt_sent', 'Отправили чек']];
 var FUN_ERR = { bad_name: 'Не ввели имя', bad_phone: 'Неверный телефон', no_service: 'Не выбрали услугу', no_agree: 'Не подтвердили условия', slot_taken: 'Время уже занято', slot_unavailable: 'Время недоступно', net: 'Нет связи' };
@@ -400,7 +436,7 @@ function funnelView(S) {
   return h + '</div></section>';
 }
 function srcView(S) {
-  var X = S.src || { state: 'idle', rows: [], msg: '', u: { source: 'instagram', custom: '', medium: 'bio', campaign: '' } }, u = X.u;
+  var X = S.src || { state: 'idle', rows: [], msg: '' };
   var h = '<section><h2>' + t('Откуда клиенты за {m}', { m: lc(S.M) }) + '</h2>';
   if (!S.sync.enabled || !S.sync.user) h += '<p class="empty">' + t('Войдите в «Настройки» (синхронизация), чтобы видеть данные Ресепшена.') + '</p>';
   else if (X.state === 'loading' || X.state === 'idle') h += '<p class="empty">' + t('Загрузка…') + '</p>';
@@ -409,20 +445,15 @@ function srcView(S) {
   else {
     var CH = { call: 'По звонку', walkin: 'Живая очередь', site: 'Сайт без метки', bot: 'Бот без метки' }, T = { total: 0, visited: 0, noshow: 0, revenue: 0 }, maxV = 1;
     X.rows.forEach(function (x) { T.total += +x.total; T.visited += +x.visited; T.noshow += +x.noshow; T.revenue += +x.revenue; if (+x.visited > maxV) maxV = +x.visited; });
-    var lbl = function (x) { if (CH[x.src]) return t(CH[x.src]); var k = SRC_SOURCES.filter(function (s) { return s[0] === x.src; })[0]; return esc(k ? t(k[1]) : x.src) + (x.campaign ? ' <span class="small muted">· ' + esc(x.campaign) + '</span>' : '') + ' <span class="chip">' + t(x.channel === 'bot' ? 'Бот' : 'Сайт') + '</span>'; };
+    var mine = {}; (S.cfg.utm || []).forEach(function (l) { mine[l.slug] = l; });
+    var lbl = function (x) { if (CH[x.src]) return t(CH[x.src]); if (mine[x.src]) return esc(mine[x.src].name) + ' <span class="chip">' + t((UTM_TYPES.filter(function (q) { return q[0] === mine[x.src].type; })[0] || ['', 'Другое'])[1]) + '</span>'; var k = SRC_SOURCES.filter(function (s) { return s[0] === x.src; })[0]; return esc(k ? t(k[1]) : x.src) + (x.campaign ? ' <span class="small muted">· ' + esc(x.campaign) + '</span>' : '') + ' <span class="chip">' + t(x.channel === 'bot' ? 'Бот' : 'Сайт') + '</span>'; };
     var top = X.rows.filter(function (x) { return +x.visited > 0; })[0];
     if (top) h += '<p class="small"><b>' + t('Больше всего клиентов пришло из: {s}', { s: lbl(top) }) + '</b></p>';
     h += '<div class="scroll"><table class="rct grid srct"><thead><tr><th>' + t('Источник') + '</th><th class="r">' + t('Записей') + '</th><th class="r">' + t('Пришли') + '</th><th class="r">' + t('Не пришли') + '</th><th class="r">' + t('Выручка') + '</th></tr></thead><tbody>' + X.rows.map(function (x) {
       return '<tr><td>' + lbl(x) + '<div class="bar" style="width:' + Math.round(+x.visited / maxV * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + x.total + '</td><td class="r num"><b>' + x.visited + '</b></td><td class="r num">' + x.noshow + '</td><td class="r num">' + fmt(+x.revenue) + '</td></tr>';
     }).join('') + '</tbody><tfoot><tr><td><b>' + t('Итого') + '</b></td><td class="r num"><b>' + T.total + '</b></td><td class="r num"><b>' + T.visited + '</b></td><td class="r num"><b>' + T.noshow + '</b></td><td class="r num"><b>' + fmt(T.revenue) + '</b></td></tr></tfoot></table></div>';
   }
-  h += '</section>' + funnelView(S) + '<section><h2>' + t('Ссылки для рекламы') + '</h2><div class="panel"><p class="small muted">' + t('Выберите, где будет стоять ссылка. Приложение создаст адрес с меткой, и клиенты с него будут видны в таблице выше. Записи по звонку и из живой очереди отмечает ресепшен.') + '</p>' +
-    '<div class="fld"><span>' + t('Где размещаем') + '</span><div class="seg four">' + SRC_SOURCES.map(function (s) { return '<button type="button" data-act="src-pick" data-id="' + s[0] + '" aria-pressed="' + (u.source === s[0]) + '">' + t(s[1]) + '</button>'; }).join('') + '</div></div>' +
-    (u.source === 'other' ? '<div class="fld"><span>' + t('Своё название') + '</span><input type="text" data-src="custom" value="' + esc(u.custom) + '" autocomplete="off"></div>' : '') +
-    '<div class="fld"><span>' + t('Формат') + '</span><div class="seg four">' + SRC_MEDIA.map(function (s) { return '<button type="button" data-act="src-medium" data-id="' + s[0] + '" aria-pressed="' + (u.medium === s[0]) + '">' + t(s[1]) + '</button>'; }).join('') + '</div></div>' +
-    '<div class="fld"><span>' + t('Название кампании (необязательно)') + '</span><input type="text" data-src="campaign" value="' + esc(u.campaign) + '" autocomplete="off" placeholder="' + esc(t('например: октябрь')) + '"></div>' +
-    '<div id="src-links">' + srcLinksHtml(u) + '</div>' +
-    '<p class="note">' + t('Штрих-код для входа по ссылке добавим позже: он будет вести на этот же адрес с меткой.') + '</p></div></section>';
+  h += '</section>' + funnelView(S);
   return h;
 }
 function loanRep(S, C) {
@@ -501,9 +532,9 @@ export function vRep(S, C) {
     tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div></section>';
   var balN = '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p>';
   // один отчёт на экране: таблицы на всю ширину, переключатель сверху
-  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), src: srcView(S), cmp: cfg.tax.regime === 'general' ? genH : cmpH + cmpRest };
+  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), src: srcView(S), utm: utmView(S), cmp: cfg.tax.regime === 'general' ? genH : cmpH + cmpRest };
   var rv = blocks[S.repView] ? S.repView : 'pl';
-  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['src', 'Источники'], ['cmp', 'Налоги']].map(function (x) {
+  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['src', 'Источники'], ['utm', 'Метки'], ['cmp', 'Налоги']].map(function (x) {
     return '<button type="button" role="tab" data-act="rep-view" data-id="' + x[0] + '" aria-pressed="' + (rv === x[0]) + '">' + t(x[1]) + '</button>';
   }).join('') + '</div>';
   var tools = '<div class="row repTools"><button type="button" class="btn ghost" data-act="export-year">' + t('Скачать отчёт за год') + '</button><button type="button" class="btn ghost" data-act="print">' + t('Печать') + '</button></div>';
@@ -617,7 +648,7 @@ export function vSet(S) {
     wipeRow('appointments', 'Записи и приёмы', 'Все записи «Ресепшена»: оплаты, возвраты, неявки и фото чеков.') + wipeRow('clients', 'Клиенты', 'База клиентов «Ресепшена» с историей.') + wipeRow('receipts', 'Фото чеков', 'Только фотографии чеков в хранилище.') + wipeRow('bot', 'Состояния бота', 'Выбранный язык и незаконченные записи в Telegram-боте.') +
     wipeRow('ops', 'Операции и зарплата', 'Доходы, расходы и зарплата по всем месяцам в «Главном».') + wipeRow('loan', 'Кредит и аренда', 'Суммы, сроки и цель кредита, аренда.') + wipeRow('assets', 'Техника и оборудование', 'Список техники с амортизацией.') + wipeRow('staff', 'Сотрудники клиники', 'Список сотрудников и ставки в «Главном».') +
     '</ul><div class="row gaptop"><button type="button" class="btn danger solid" data-act="wipe" data-id="all"' + (S.wipeBusy ? ' disabled' : '') + '>' + t('Удалить всё и начать с нуля') + '</button></div></div></section>';
-  var LOGK = { add: 'Добавлена операция', del: 'Удалена операция', lock: 'Месяц закрыт', unlock: 'Месяц открыт', unaccrue: 'Отменено начисление зарплаты', taxmode: 'Режим налогов переключён на общий (НДС + налог на прибыль)' };
+  var LOGK = { add: 'Добавлена операция', del: 'Удалена операция', lock: 'Месяц закрыт', unlock: 'Месяц открыт', unaccrue: 'Отменено начисление зарплаты', taxmode: 'Режим налогов переключён на общий (НДС + налог на прибыль)', utmadd: 'Создана метка', utmdel: 'Удалена метка' };
   var logs = (S.cfg.log || []).slice(0, 40);
   var logHtml = '<section><h2>' + t('Журнал действий') + '</h2><div class="panel">' + (logs.length ? '<ul class="list">' + logs.map(function (e) {
     var when = ''; try { when = new Date(e.ts).toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (x) { /* без времени */ }
