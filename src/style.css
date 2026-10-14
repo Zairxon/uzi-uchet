@@ -507,3 +507,12 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .rcp td.num{white-space:nowrap}
 /* крупные суммы не должны ломаться по цифрам */
 .kpis.three .kpi b{font-size:clamp(11px,3.3vw,16px);white-space:nowrap;overflow-wrap:normal}
+
+/* пациенты дня: узкие «№» и «Время», широкая ячейка пациента (имя и фамилия помещаются), таблица листается вбок */
+.rcp{table-layout:fixed!important;width:max(100%,500px)!important;min-width:0!important}
+.rcp th:nth-child(1),.rcp td:nth-child(1){width:30px!important;min-width:0!important;padding-left:2px!important;padding-right:2px!important}
+.rcp th:nth-child(2),.rcp td:nth-child(2){width:54px!important;min-width:0!important}
+.rcp th:nth-child(3),.rcp td:nth-child(3){width:170px!important;white-space:normal!important}
+.rcp th:nth-child(4),.rcp td:nth-child(4){width:120px!important}
+.rcp th:last-child,.rcp td:last-child{width:126px!important}
+.rcp td{word-break:normal!important;overflow-wrap:anywhere}
