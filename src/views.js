@@ -445,8 +445,7 @@ function srcView(S) {
       return '<tr><td>' + lbl(x) + '<div class="bar" style="width:' + Math.round(+x.visited / maxV * 100) + '%;height:5px;margin-top:5px"></div></td><td class="r num">' + (+x.visits || '–') + '</td><td class="r num">' + x.total + '</td><td class="r num"><b>' + x.visited + '</b></td><td class="r num">' + x.noshow + '</td><td class="r num">' + fmt(+x.revenue) + '</td></tr>';
     }).join('') + '</tbody><tfoot><tr><td><b>' + t('Итого') + '</b></td><td class="r num"><b>' + T.vis + '</b></td><td class="r num"><b>' + T.total + '</b></td><td class="r num"><b>' + T.visited + '</b></td><td class="r num"><b>' + T.noshow + '</b></td><td class="r num"><b>' + fmt(T.revenue) + '</b></td></tr></tfoot></table></div>';
   }
-  h += '</section>' + funnelView(S);
-  return h;
+  return h + '</section>';
 }
 function loanRep(S, C) {
   var cfg = S.cfg, M = S.M, l = cfg.loan, B = C.B, started = !!(l.amount && ymOf(l.start) && ymOf(l.start) <= M), SC = sched(l, ymOf(l.start) || M), h = '';
@@ -524,9 +523,9 @@ export function vRep(S, C) {
     tr('Проверка: активы − обязательства − капитал', [A - L - E], 'sum') + '</tbody></table></div></section>';
   var balN = '<p class="note">' + t('Активы = Обязательства + Капитал. Если в строке проверки ноль, учёт сходится.') + '</p>';
   // один отчёт на экране: таблицы на всю ширину, переключатель сверху
-  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), src: srcView(S), utm: utmView(S), cmp: cfg.tax.regime === 'general' ? genH : cmpH + cmpRest };
-  var rv = blocks[S.repView] ? S.repView : 'pl';
-  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['src', 'Источники'], ['utm', 'Метки'], ['cmp', 'Налоги']].map(function (x) {
+  var blocks = { pl: plH, cash: cashH + cashN, bal: balH + balN, loan: loanRep(S, C), src: srcView(S) + utmView(S) + funnelView(S), cmp: cfg.tax.regime === 'general' ? genH : cmpH + cmpRest };
+  var rv = blocks[S.repView] ? S.repView : S.repView === 'utm' ? 'src' : 'pl';
+  var nav = '<div class="seg four" role="tablist">' + [['pl', 'Прибыль'], ['cash', 'Деньги'], ['bal', 'Баланс'], ['loan', 'Кредит'], ['src', 'Источники и метки'], ['cmp', 'Налоги']].map(function (x) {
     return '<button type="button" role="tab" data-act="rep-view" data-id="' + x[0] + '" aria-pressed="' + (rv === x[0]) + '">' + t(x[1]) + '</button>';
   }).join('') + '</div>';
   var tools = '<div class="row repTools"><button type="button" class="btn ghost" data-act="export-year">' + t('Скачать отчёт за год') + '</button><button type="button" class="btn ghost" data-act="print">' + t('Печать') + '</button></div>';

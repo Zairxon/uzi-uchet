@@ -385,7 +385,7 @@ document.addEventListener('click', function (ev) {
     return;
   }
   S.armed = null;
-  if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); if (id === 'src' || id === 'utm') loadSrc(); }
+  if (act === 'rep-view') { S.repView = id; try { localStorage.setItem('uzi-rep', id); } catch (e) { /* не страшно */ } render(); if (id === 'src') loadSrc(); }
   else if (act === 'utm-type') { utmDraft().type = id; render(); }
   else if (act === 'utm-copy') { var uu = b.dataset.url || ''; try { navigator.clipboard.writeText(uu); } catch (e) { var tmp = document.createElement('input'); tmp.value = uu; document.body.appendChild(tmp); tmp.select(); document.execCommand('copy'); tmp.remove(); } var old = b.textContent; b.textContent = T('Скопировано'); setTimeout(function () { b.textContent = old; }, 1500); }
   else if (act === 'utm-add') utmAdd();
@@ -394,8 +394,8 @@ document.addEventListener('click', function (ev) {
   else if (act === 'lang-menu') { var lm = document.getElementById('langmenu'); lm.hidden = !lm.hidden; }
   else if (act === 'theme-flip') { var nx = effDark() ? 'light' : 'dark'; try { localStorage.setItem('uzi-theme', nx); } catch (e) { /* не страшно */ } applyTheme(nx); render(); }
   else if (act === 'theme-set') { try { localStorage.setItem('uzi-theme', id); } catch (e) { /* не страшно */ } applyTheme(id); render(); }
-  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && (S.repView === 'src' || S.repView === 'utm')) loadSrc(); rcSync(S.M); }
-  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && (S.repView === 'src' || S.repView === 'utm')) loadSrc(); rcSync(S.M); }
+  else if (act === 'prev') { S.M = addM(S.M, -1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); rcSync(S.M); }
+  else if (act === 'next') { S.M = addM(S.M, 1); render(); if (S.tab === 'pay') loadClinic(); if (S.tab === 'rep' && S.repView === 'src') loadSrc(); rcSync(S.M); }
   else if (act === 'tab') openTab(id);
   else if (act === 'ops-prev') { S.opsDay = addDays(S.opsDay, -1); dayRcLoad(); }
   else if (act === 'ops-next') { S.opsDay = addDays(S.opsDay, 1); dayRcLoad(); }
