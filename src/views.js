@@ -435,7 +435,7 @@ function srcView(S) {
   else if (X.state === 'error') h += '<p class="alert">' + esc(X.msg) + '</p>';
   else if (!srcRows(S).length) h += '<p class="empty">' + t('Нет записей и входов за этот месяц.') + '</p>';
   else {
-    var rows = srcRows(S), CH = { call: 'По звонку', walkin: 'Живая очередь', site: 'Сайт без метки', bot: 'Бот без метки' }, T = { total: 0, visited: 0, noshow: 0, revenue: 0, vis: 0 }, maxV = 1;
+    var rows = srcRows(S), CH = { call: 'По звонку', walkin: 'Живая очередь', site: 'Сайт без метки', bot: 'Бот без метки', ssilkasnavbat: 'Кнопка «Отправить ссылку» в «Ресепшене»' }, T = { total: 0, visited: 0, noshow: 0, revenue: 0, vis: 0 }, maxV = 1;
     rows.forEach(function (x) { T.total += +x.total; T.vis += +x.visits; T.visited += +x.visited; T.noshow += +x.noshow; T.revenue += +x.revenue; if (+x.visited > maxV) maxV = +x.visited; });
     var mine = {}; (S.cfg.utm || []).forEach(function (l) { mine[l.slug] = l; });
     var lbl = function (x) { if (CH[x.src]) return t(CH[x.src]); if (mine[x.src]) return esc(mine[x.src].name) + ' <span class="chip">' + t((UTM_TYPES.filter(function (q) { return q[0] === mine[x.src].type; })[0] || ['', 'Другое'])[1]) + '</span>'; var k = SRC_SOURCES.filter(function (s) { return s[0] === x.src; })[0]; return esc(k ? t(k[1]) : x.src) + (x.campaign ? ' <span class="small muted">· ' + esc(x.campaign) + '</span>' : '') + ' <span class="chip">' + t(x.channel === 'bot' ? 'Бот' : 'Сайт') + '</span>'; };
