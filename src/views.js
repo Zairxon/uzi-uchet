@@ -397,7 +397,7 @@ function utmView(S) {
 }
 // Воронка записи: сколько посетителей сайта дошло до каждого шага
 var FUN = [['open', 'Открыли сайт'], ['day', 'Выбрали день'], ['doctor', 'Выбрали врача'], ['time', 'Выбрали время'], ['service', 'Выбрали услугу'], ['form', 'Начали вводить имя и телефон'], ['book_click', 'Нажали «Записаться»'], ['held', 'Время удержано (ждём чек)'], ['pay_view', 'Открыли экран оплаты'], ['receipt_pick', 'Выбрали фото чека'], ['receipt_sent', 'Отправили чек']];
-var FUN_ERR = { bad_name: 'Не ввели имя', bad_phone: 'Неверный телефон', no_service: 'Не выбрали услугу', no_agree: 'Не подтвердили условия', slot_taken: 'Время уже занято', slot_unavailable: 'Время недоступно', net: 'Нет связи' };
+var FUN_ERR = { bad_name: 'Не ввели имя', bad_phone: 'Неверный телефон', no_service: 'Не выбрали услугу', no_agree: 'Не подтвердили условия', receipt_timeout: 'Чек не отправился: слабая связь', receipt_fail: 'Чек не отправился', slot_taken: 'Время уже занято', slot_unavailable: 'Время недоступно', net: 'Нет связи' };
 function funnelView(S) {
   var f = S.src && S.src.fun; if (!f) return '';
   var R = f.reached || {}, ST = f.stopped || {}, n = +f.sessions || 0;
