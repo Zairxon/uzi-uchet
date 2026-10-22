@@ -516,3 +516,7 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .rcp th:nth-child(4),.rcp td:nth-child(4){width:120px!important}
 .rcp th:last-child,.rcp td:last-child{width:126px!important}
 .rcp td{word-break:normal!important;overflow-wrap:anywhere}
+#instbar{display:flex;align-items:center;gap:8px;padding:calc(6px + env(safe-area-inset-top,0px)) 12px 6px;background:var(--surface);border-bottom:1px solid var(--line)}
+#instbar .instgo{flex:1;font:inherit;font-size:13px;font-weight:600;padding:8px 12px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+#instbar .insthint{flex:1;font-size:12px;color:var(--muted);text-align:center}
+#instbar .instx{font:inherit;font-size:18px;line-height:1;width:30px;height:30px;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);cursor:pointer}

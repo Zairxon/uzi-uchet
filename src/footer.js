@@ -1,5 +1,6 @@
 // Нижняя панель: когда собрана эта версия и кнопка «Обновить». Если на сервере уже лежит более новая сборка, кнопка выделяется.
 import { t } from './i18n.js';
+import { drawInstall } from './install.js';
 
 const BUILD = typeof __BUILD__ !== 'undefined' ? __BUILD__ : 'dev';
 let name = '', newer = false, started = false, busy = false;
@@ -12,6 +13,7 @@ export async function hardRefresh() {
   const u = new URL(location.href); u.searchParams.set('u', Date.now()); location.replace(u.toString()); // новый адрес: обходим кэш браузера
 }
 export function drawFooter() {
+  drawInstall();
   let el = document.getElementById('appfoot');
   if (!el) { el = document.createElement('footer'); el.id = 'appfoot'; document.body.appendChild(el); el.addEventListener('click', (ev) => { if (ev.target.closest('#fup')) hardRefresh(); }); }
   el.innerHTML = '<span class="fv">' + name + ' · ' + t('Версия') + ' ' + stamp(BUILD) + '</span>' + (newer || busy ? '<button type="button" id="fup" class="fup' + (newer ? ' new' : '') + '"' + (busy ? ' disabled' : '') + '>' + t(busy ? 'Обновляю…' : newer ? 'Обновить: есть новая версия' : 'Обновить') + '</button>' : '');
